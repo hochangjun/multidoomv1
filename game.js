@@ -1227,17 +1227,25 @@ class GameView extends Multisynq.View {
         
         // Global touch start handler
         document.addEventListener('touchstart', (e) => {
-            e.preventDefault();
+            let preventedDefault = false;
             
             for (let touch of e.touches) {
                 // Check if touch started on movement joystick
                 if (moveTouchId === null && isTouchInJoystick(touch, moveJoystick)) {
+                    if (!preventedDefault) {
+                        e.preventDefault();
+                        preventedDefault = true;
+                    }
                     moveTouchId = touch.identifier;
                     console.log('Move joystick started:', moveTouchId);
                 }
                 
                 // Check if touch started on aim joystick
                 if (aimTouchId === null && isTouchInJoystick(touch, aimJoystick)) {
+                    if (!preventedDefault) {
+                        e.preventDefault();
+                        preventedDefault = true;
+                    }
                     aimTouchId = touch.identifier;
                     isShooting = true;
                     console.log('Aim joystick started:', aimTouchId);
@@ -1255,11 +1263,22 @@ class GameView extends Multisynq.View {
         
         // Global touch move handler - throttled to 10fps for better mobile performance
         document.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            
             const now = performance.now();
             if (now - this.lastTouchUpdate < 100) return; // 10fps = 100ms
             this.lastTouchUpdate = now;
+            
+            let shouldPreventDefault = false;
+            for (let touch of e.touches) {
+                // Only prevent default if we're handling joystick touches
+                if (touch.identifier === moveTouchId || touch.identifier === aimTouchId) {
+                    shouldPreventDefault = true;
+                    break;
+                }
+            }
+            
+            if (shouldPreventDefault) {
+                e.preventDefault();
+            }
             
             for (let touch of e.touches) {
                 // Handle movement joystick
