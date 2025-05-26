@@ -11,8 +11,12 @@
   ],
   "routes": [
     {
+      "src": "/(index.html|game.js|styles.css)",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
-} 
+}
