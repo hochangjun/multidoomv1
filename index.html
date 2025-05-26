@@ -113,6 +113,17 @@
                 }
                 #canvas {
                     margin-bottom: 200px;
+                    max-height: calc(100vh - 200px);
+                }
+                
+                /* Adjust joystick positions for better spacing */
+                #move-joystick {
+                    left: 20px;
+                    bottom: 20px;
+                }
+                #aim-joystick {
+                    right: 20px;
+                    bottom: 20px;
                 }
             }
             #ui {
@@ -128,6 +139,32 @@
                 border: 2px solid #ff3333;
                 box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
                 font-weight: 700;
+                z-index: 100;
+            }
+            
+            /* Mobile UI adjustments */
+            @media (hover: none) and (pointer: coarse) {
+                #ui {
+                    top: 5px;
+                    right: 5px;
+                    padding: 8px;
+                    font-size: 12px;
+                    min-width: 180px;
+                }
+                #initials {
+                    bottom: 220px !important; /* Move above mobile controls */
+                    left: 5px;
+                    padding: 8px;
+                    font-size: 12px;
+                }
+                #controls {
+                    display: none; /* Hide desktop controls text on mobile */
+                }
+                #title {
+                    font-size: 18px;
+                    top: 5px;
+                    left: 5px;
+                }
             }
             #initials {
                 position: fixed;
@@ -1212,30 +1249,44 @@ class GameView extends Multisynq.View {
         let isShooting = false;
         let shootInterval = null;
         
-        // Movement joystick
-        moveJoystick.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (moveTouchId === null) {
-                moveTouchId = e.touches[0].identifier;
-            }
-        });
+        // Helper function to check if touch is inside joystick
+        const isTouchInJoystick = (touch, joystick) => {
+            const rect = joystick.getBoundingClientRect();
+            return touch.clientX >= rect.left && 
+                   touch.clientX <= rect.right && 
+                   touch.clientY >= rect.top && 
+                   touch.clientY <= rect.bottom;
+        };
         
-        // Aim joystick
-        aimJoystick.addEventListener('touchstart', (e) => {
+        // Global touch start handler
+        document.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (aimTouchId === null) {
-                aimTouchId = e.touches[0].identifier;
-                isShooting = true;
+            
+            for (let touch of e.touches) {
+                // Check if touch started on movement joystick
+                if (moveTouchId === null && isTouchInJoystick(touch, moveJoystick)) {
+                    moveTouchId = touch.identifier;
+                    console.log('Move joystick started:', moveTouchId);
+                }
                 
-                // Start continuous shooting
-                shootInterval = setInterval(() => {
-                    if (isShooting) {
-                        this.publish(this.viewId, "shoot");
-                    }
-                }, 200); // Shoot every 200ms
+                // Check if touch started on aim joystick
+                if (aimTouchId === null && isTouchInJoystick(touch, aimJoystick)) {
+                    aimTouchId = touch.identifier;
+                    isShooting = true;
+                    console.log('Aim joystick started:', aimTouchId);
+                    
+                    // Start continuous shooting
+                    if (shootInterval) clearInterval(shootInterval);
+                    shootInterval = setInterval(() => {
+                        if (isShooting) {
+                            this.publish(this.viewId, "shoot");
+                        }
+                    }, 200); // Shoot every 200ms
+                }
             }
-        });
+        }, { passive: false });
         
+        // Global touch move handler
         document.addEventListener('touchmove', (e) => {
             e.preventDefault();
             
@@ -1249,24 +1300,26 @@ class GameView extends Multisynq.View {
                     const dx = touch.clientX - centerX;
                     const dy = touch.clientY - centerY;
                     
-                    const maxDistance = 30;
+                    const maxDistance = 40; // Increased for better control
                     const clampedDx = Math.max(-maxDistance, Math.min(maxDistance, dx));
                     const clampedDy = Math.max(-maxDistance, Math.min(maxDistance, dy));
                     
                     moveKnob.style.left = `${20 + clampedDx}px`;
                     moveKnob.style.top = `${20 + clampedDy}px`;
                     
-                    // Update movement
+                    // Update movement with better thresholds
+                    const threshold = 15;
                     const newKeys = {
-                        up: clampedDy < -10,
-                        down: clampedDy > 10,
-                        left: clampedDx < -10,
-                        right: clampedDx > 10
+                        up: clampedDy < -threshold,
+                        down: clampedDy > threshold,
+                        left: clampedDx < -threshold,
+                        right: clampedDx > threshold
                     };
                     
                     if (JSON.stringify(newKeys) !== JSON.stringify(this.keys)) {
                         this.keys = newKeys;
                         this.publish(this.viewId, "move", this.keys);
+                        console.log('Movement updated:', newKeys);
                     }
                 }
                 
@@ -1279,22 +1332,23 @@ class GameView extends Multisynq.View {
                     const dx = touch.clientX - centerX;
                     const dy = touch.clientY - centerY;
                     
-                    const maxDistance = 30;
+                    const maxDistance = 40; // Increased for better control
                     const clampedDx = Math.max(-maxDistance, Math.min(maxDistance, dx));
                     const clampedDy = Math.max(-maxDistance, Math.min(maxDistance, dy));
                     
                     aimKnob.style.left = `${20 + clampedDx}px`;
                     aimKnob.style.top = `${20 + clampedDy}px`;
                     
-                    // Update aim direction
-                    if (Math.abs(clampedDx) > 5 || Math.abs(clampedDy) > 5) {
+                    // Update aim direction with better threshold
+                    if (Math.abs(clampedDx) > 8 || Math.abs(clampedDy) > 8) {
                         const angle = Math.atan2(clampedDy, clampedDx);
                         this.publish(this.viewId, "aim", {angle});
                     }
                 }
             }
-        });
+        }, { passive: false });
         
+        // Global touch end handler
         document.addEventListener('touchend', (e) => {
             for (let touch of e.changedTouches) {
                 // Handle movement joystick end
@@ -1306,6 +1360,7 @@ class GameView extends Multisynq.View {
                     // Stop movement
                     this.keys = {up: false, down: false, left: false, right: false};
                     this.publish(this.viewId, "move", this.keys);
+                    console.log('Move joystick ended');
                 }
                 
                 // Handle aim joystick end
@@ -1320,9 +1375,10 @@ class GameView extends Multisynq.View {
                         clearInterval(shootInterval);
                         shootInterval = null;
                     }
+                    console.log('Aim joystick ended');
                 }
             }
-        });
+        }, { passive: false });
         
         // Handle touch cancel (when user drags outside)
         document.addEventListener('touchcancel', (e) => {
@@ -1346,7 +1402,7 @@ class GameView extends Multisynq.View {
                     }
                 }
             }
-        });
+        }, { passive: false });
     }
 
     update() {
