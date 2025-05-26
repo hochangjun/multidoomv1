@@ -131,6 +131,33 @@ C.POWERUP_SPAWN_CHANCE = 0.7; // 70% chance for imp to drop powerup
 C.POWERUP_LIFETIME = 1800; // 30 seconds before disappearing
 C.MAX_CHAT_HISTORY = 50;
 
+// Static wall layout - no need to sync these since they never change
+C.WALLS = [
+    // Outer walls
+    {x: 0, y: 0, w: 800, h: 20}, // top (using MAP_WIDTH/HEIGHT values directly)
+    {x: 0, y: 580, w: 800, h: 20}, // bottom 
+    {x: 0, y: 0, w: 20, h: 600}, // left
+    {x: 780, y: 0, w: 20, h: 600}, // right
+    
+    // Central cross structure
+    {x: 350, y: 200, w: 100, h: 20}, // horizontal center
+    {x: 380, y: 150, w: 20, h: 100}, // vertical center
+    
+    // Corner bunkers
+    {x: 100, y: 100, w: 80, h: 20}, // top-left bunker
+    {x: 100, y: 100, w: 20, h: 80},
+    {x: 620, y: 100, w: 80, h: 20}, // top-right bunker
+    {x: 680, y: 100, w: 20, h: 80},
+    {x: 100, y: 480, w: 80, h: 20}, // bottom-left bunker
+    {x: 100, y: 480, w: 20, h: 80},
+    {x: 620, y: 480, w: 80, h: 20}, // bottom-right bunker
+    {x: 680, y: 480, w: 20, h: 80},
+    
+    // Side corridors
+    {x: 250, y: 350, w: 20, h: 100}, // left corridor
+    {x: 530, y: 350, w: 20, h: 100}, // right corridor
+];
+
 // Separate model chunks to avoid 10k message limit
 class GameEntities extends Multisynq.Model {
     init() {
@@ -154,41 +181,10 @@ GameEntities.register("GameEntities");
 
 class GameStatic extends Multisynq.Model {
     init() {
-        this.walls = new Set();
+        // No walls set needed - walls are now in Constants
     }
     
     get game() { return this.wellKnownModel("modelRoot"); }
-    
-    createWalls() {
-        // Create strategic wall layout - more Doom-like
-        const walls = [
-            // Outer walls
-            {x: 0, y: 0, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // top
-            {x: 0, y: C.MAP_HEIGHT - C.WALL_THICKNESS, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // bottom
-            {x: 0, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // left
-            {x: C.MAP_WIDTH - C.WALL_THICKNESS, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // right
-            
-            // Central cross structure
-            {x: 350, y: 200, w: 100, h: C.WALL_THICKNESS}, // horizontal center
-            {x: 380, y: 150, w: C.WALL_THICKNESS, h: 100}, // vertical center
-            
-            // Corner bunkers
-            {x: 100, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-left bunker
-            {x: 100, y: 100, w: C.WALL_THICKNESS, h: 80},
-            {x: 620, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-right bunker
-            {x: 680, y: 100, w: C.WALL_THICKNESS, h: 80},
-            {x: 100, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-left bunker
-            {x: 100, y: 480, w: C.WALL_THICKNESS, h: 80},
-            {x: 620, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-right bunker
-            {x: 680, y: 480, w: C.WALL_THICKNESS, h: 80},
-            
-            // Side corridors
-            {x: 250, y: 350, w: C.WALL_THICKNESS, h: 100}, // left corridor
-            {x: 530, y: 350, w: C.WALL_THICKNESS, h: 100}, // right corridor
-        ];
-        
-        walls.forEach(wall => Wall.create(wall));
-    }
 }
 GameStatic.register("GameStatic");
 
@@ -212,41 +208,12 @@ class Game extends Multisynq.Model {
         // Chat subscriptions
         this.subscribe("chat", "post", this.handleNewChatMessage);
         
-        this.gameStatic.createWalls();
+        // Walls are now static constants, no need to create them
         this.gameEntities.spawnMonster();
         this.mainLoop();
     }
 
-    createWalls() {
-        // Create strategic wall layout - more Doom-like
-        const walls = [
-            // Outer walls
-            {x: 0, y: 0, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // top
-            {x: 0, y: C.MAP_HEIGHT - C.WALL_THICKNESS, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // bottom
-            {x: 0, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // left
-            {x: C.MAP_WIDTH - C.WALL_THICKNESS, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // right
-            
-            // Central cross structure
-            {x: 350, y: 200, w: 100, h: C.WALL_THICKNESS}, // horizontal center
-            {x: 380, y: 150, w: C.WALL_THICKNESS, h: 100}, // vertical center
-            
-            // Corner bunkers
-            {x: 100, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-left bunker
-            {x: 100, y: 100, w: C.WALL_THICKNESS, h: 80},
-            {x: 620, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-right bunker
-            {x: 680, y: 100, w: C.WALL_THICKNESS, h: 80},
-            {x: 100, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-left bunker
-            {x: 100, y: 480, w: C.WALL_THICKNESS, h: 80},
-            {x: 620, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-right bunker
-            {x: 680, y: 480, w: C.WALL_THICKNESS, h: 80},
-            
-            // Side corridors
-            {x: 250, y: 350, w: C.WALL_THICKNESS, h: 100}, // left corridor
-            {x: 530, y: 350, w: C.WALL_THICKNESS, h: 100}, // right corridor
-        ];
-        
-        walls.forEach(wall => Wall.create(wall));
-    }
+
 
     spawnMonster() {
         // Spawn large monster in center area
@@ -336,8 +303,8 @@ class Game extends Multisynq.Model {
             return false;
         }
         
-        // Check walls
-        for (const wall of this.gameStatic.walls) {
+        // Check walls (now using static constants)
+        for (const wall of C.WALLS) {
             if (x - radius < wall.x + wall.w &&
                 x + radius > wall.x &&
                 y - radius < wall.y + wall.h &&
@@ -577,11 +544,11 @@ class Game extends Multisynq.Model {
             }
         }
         
-        // Bullet vs Wall collisions
+        // Bullet vs Wall collisions (now using static constants)
         for (const bullet of this.gameEntities.bullets) {
             if (bullet.destroyed) continue;
             
-            for (const wall of this.gameStatic.walls) {
+            for (const wall of C.WALLS) {
                 if (this.bulletWallCollision(bullet, wall)) {
                     bullet.destroy();
                     break;
@@ -638,23 +605,7 @@ class GameObject extends Multisynq.Model {
     }
 }
 
-class Wall extends GameObject {
-    init(options) {
-        super.init(options);
-        const {x, y, w, h} = options;
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
-        this.game.gameStatic.walls.add(this);
-    }
-    
-    destroy() {
-        this.game.gameStatic.walls.delete(this);
-        super.destroy();
-    }
-}
-Wall.register("Wall");
+// Wall class removed - walls are now static constants in C.WALLS
 
 class Monster extends GameObject {
     init(options) {
@@ -749,7 +700,7 @@ class Monster extends GameObject {
     }
 
     wouldCollideWithWalls(x, y) {
-        for (const wall of this.game.gameStatic.walls) {
+        for (const wall of C.WALLS) {
             if (x - this.size < wall.x + wall.w &&
                 x + this.size > wall.x &&
                 y - this.size < wall.y + wall.h &&
@@ -963,7 +914,7 @@ class Player extends GameObject {
     }
 
     wouldCollideWithWalls(x, y) {
-        for (const wall of this.game.gameStatic.walls) {
+        for (const wall of C.WALLS) {
             if (x - C.PLAYER_SIZE < wall.x + wall.w &&
                 x + C.PLAYER_SIZE > wall.x &&
                 y - C.PLAYER_SIZE < wall.y + wall.h &&
@@ -1440,9 +1391,9 @@ class GameView extends Multisynq.View {
         
         this.ctx.clearRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
         
-        // Draw walls with Doom-style shading
+        // Draw walls with Doom-style shading (now using static constants)
         this.ctx.fillStyle = "#444";
-        for (const wall of this.model.gameStatic.walls) {
+        for (const wall of C.WALLS) {
             this.ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
             // Add highlight edge
             this.ctx.fillStyle = "#666";
