@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-        <title>DOOM Arena</title>
+        <title>MULTIDOOM</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><text x='16' y='20' text-anchor='middle' fill='%23ff3333' font-family='monospace' font-size='16' font-weight='bold'>D</text></svg>" type="image/svg+xml">
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
@@ -129,6 +129,11 @@
                     right: 20px;
                     bottom: 20px;
                 }
+                
+                /* Move name input higher on mobile to avoid joysticks */
+                #initials {
+                    bottom: 180px; /* Higher on mobile */
+                }
             }
             #ui {
                 position: fixed;
@@ -172,17 +177,20 @@
             }
             #initials {
                 position: fixed;
-                bottom: 10px;
-                left: 10px;
-                padding: 10px;
+                bottom: 120px; /* Move above mobile controls */
+                left: 50%;
+                transform: translateX(-50%); /* Center horizontally */
+                padding: 12px 20px;
                 border-radius: 8px;
                 background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
                 border: 2px solid #ff3333;
                 color: #ff6666;
-                font-size: 14px;
+                font-size: 16px;
                 font-family: 'Orbitron', monospace;
                 font-weight: 700;
                 box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
+                text-align: center;
+                min-width: 200px;
             }
             #initials::placeholder {
                 color: #ff9999;
@@ -221,7 +229,7 @@
         <script src="https://cdn.jsdelivr.net/npm/@multisynq/client@1.0.1/bundled/multisynq-client.min.js"></script>
     </head>
     <body>
-        <div id="title">DOOM ARENA</div>
+        <div id="title">MULTIDOOM</div>
         <canvas id="canvas" width="800" height="600"></canvas>
         
         <!-- Mobile Controls -->
@@ -649,10 +657,7 @@ class Game extends Multisynq.Model {
             powerup.update();
         }
         this.checkCollisions();
-        // Adaptive frame rate for mobile performance
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const frameTime = isMobile ? 33 : 16; // 30fps on mobile, 60fps on desktop
-        this.future(frameTime).mainLoop();
+        this.future(16).mainLoop(); // Back to 60fps for all devices
     }
 
     checkCollisions() {
@@ -669,7 +674,7 @@ class Game extends Multisynq.Model {
                 
                 if (dist < C.PLAYER_SIZE + bullet.size) {
                     const shooter = this.players.get(bullet.shooterId);
-                    player.takeDamage(bullet.damage || 50);
+                    player.takeDamage(bullet.damage || 20);
                     bullet.destroy();
                     
                     if (player.dead) {
@@ -979,7 +984,7 @@ class Player extends GameObject {
         const bulletX = this.x + Math.cos(this.angle) * C.PLAYER_SIZE;
         const bulletY = this.y + Math.sin(this.angle) * C.PLAYER_SIZE;
         
-        const bulletDamage = this.damageBoost > 0 ? 100 : 50; // Increased damage with powerup
+        const bulletDamage = this.damageBoost > 0 ? 40 : 20; // 5 hits to kill (20x5=100), damage boost = 2.5 hits to kill
         const bulletSize = this.damageBoost > 0 ? C.BULLET_SIZE * 2.5 : C.BULLET_SIZE; // Much bigger bullets
         
         Bullet.create({
@@ -1039,11 +1044,7 @@ class Player extends GameObject {
         
         // Update powerup timers
         if (this.speedBoost > 0) this.speedBoost--;
-        if (this.shield > 0) {
-            this.shield--;
-            // Keep invincible while shield is active
-            if (this.shield > 0) this.invincible = Math.max(this.invincible, 1);
-        }
+        if (this.shield > 0) this.shield--; // Shield just counts down, no auto-invincibility
         if (this.damageBoost > 0) this.damageBoost--;
         
         // Apply movement
@@ -1100,13 +1101,22 @@ class Player extends GameObject {
         return false;
     }
 
-    takeDamage(amount = 50) {
-        // Shield provides complete invincibility
+    takeDamage(amount = 20) { // Reduced from 50 to 20 (5 hits to kill)
+        // Shield deflects one hit and activates invincibility
         if (this.shield > 0) {
-            return; // No damage taken
+            this.shield = 0; // Shield is consumed after one hit
+            this.invincible = C.INVINCIBILITY_FRAMES; // Still get invincibility frames
+            this.publish(this.game.sessionId, "sound", {type: "hit", viewId: this.viewId});
+            return; // No damage taken but shield is gone
+        }
+        
+        // Regular invincibility frames prevent damage
+        if (this.invincible > 0) {
+            return; // No damage during invincibility
         }
         
         this.health -= amount;
+        this.invincible = C.INVINCIBILITY_FRAMES; // Set invincibility after taking damage
         this.publish(this.game.sessionId, "sound", {type: "hit", viewId: this.viewId});
         
         if (this.health <= 0) {
@@ -1131,7 +1141,7 @@ class Bullet extends GameObject {
         this.vx = vx;
         this.vy = vy;
         this.shooterId = shooterId;
-        this.damage = damage || 50;
+        this.damage = damage || 20;
         this.size = size || C.BULLET_SIZE;
         this.lifetime = C.BULLET_LIFETIME;
         this.game.bullets.add(this);
@@ -1597,7 +1607,7 @@ class GameView extends Multisynq.View {
 
     drawBullet(bullet) {
         // Enhanced bullets for damage boost
-        const isDamageBoost = bullet.damage > 50;
+        const isDamageBoost = bullet.damage > 20;
         const glowColor = isDamageBoost ? "#ff6600" : "#ffff00";
         const coreColor = isDamageBoost ? "#ff3300" : "#ffffff";
         
@@ -1620,7 +1630,10 @@ class GameView extends Multisynq.View {
     drawPlayer(player) {
         const isMe = player.viewId === this.viewId;
         
-        // No more annoying blinking - just draw normally
+        // Invincibility blinking when hit (but not for shield)
+        if (player.invincible > 0 && player.shield === 0 && Math.floor(player.invincible / 5) % 2 === 0) {
+            return; // Skip drawing every 5 frames for flashing effect when actually hit
+        }
         
         // Shield visual effect - draw first so it's behind player
         if (!player.dead && player.shield > 0) {
