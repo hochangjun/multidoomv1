@@ -25,7 +25,11 @@ A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framewo
 - **Invincibility Frames**: 1.5 seconds of immunity after taking damage
 
 ### Technical Features
-- **Mobile Responsive**: Touch controls with on-screen joystick
+- **Mobile Responsive**: Full touch controls with on-screen joystick
+  - Touch and drag for movement
+  - Release touch to shoot
+  - Tap anywhere to shoot
+  - Automatic joystick positioning
 - **Sound Effects**: Procedural audio using Web Audio API
 - **Enhanced Visual Effects**: 
   - 2.5x bigger bullets for damage boost
@@ -83,7 +87,16 @@ Built with the **Multisynq** multiplayer framework:
 
 ## 🔧 Configuration
 
-Key constants in `multiblaster.html`:
+### Environment Variables
+Set these in your Vercel dashboard under Settings > Environment Variables:
+
+```bash
+MULTISYNQ_API_KEY=your_api_key_from_multisynq.io
+MULTISYNQ_APP_ID=your_unique_app_identifier
+```
+
+### Game Constants
+Key constants in the game code:
 ```javascript
 C.MAX_ACTIVE_PLAYERS = 8;        // Maximum simultaneous players
 C.POWERUP_SPAWN_CHANCE = 0.7;    // 70% chance for imp powerup drop
@@ -96,8 +109,12 @@ C.RESPAWN_TIME = 300;            // 5 seconds respawn delay
 ### Vercel (Recommended)
 1. Push to GitHub
 2. Connect repository to Vercel
-3. Deploy as static site
-4. Game supports unlimited concurrent sessions
+3. **Set Environment Variables** in Vercel Dashboard:
+   - Go to Settings > Environment Variables
+   - Add `MULTISYNQ_API_KEY` with your API key
+   - Add `MULTISYNQ_APP_ID` with your app ID
+4. Deploy as static site
+5. Game supports unlimited concurrent sessions
 
 ### Other Platforms
 - **Netlify**: Drag & drop `multiblaster.html`

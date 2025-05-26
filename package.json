@@ -1,0 +1,14 @@
+{
+  "name": "multidoom-v1",
+  "version": "1.0.0",
+  "description": "Multiplayer 2D Doom-style arena shooter",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hochangjun/multidoomv1.git"
+  },
+  "author": "hochangjun",
+  "license": "MIT"
+} 
