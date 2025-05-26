@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+        <title>DOOM Arena</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+            
+            html, body {
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
+                touch-action: none;
+                background: linear-gradient(45deg, #1a0000, #330000, #1a0000);
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+                font-family: 'Orbitron', 'Courier New', monospace;
+                color: #ff6666;
+            }
+            #canvas {
+                background: linear-gradient(135deg, #0d0d0d, #1a1a1a, #0d0d0d);
+                object-fit: contain;
+                max-width: 100%;
+                max-height: 100%;
+                border: 3px solid #ff3333;
+                box-shadow: 0 0 20px #ff3333;
+                cursor: crosshair;
+            }
+            #joystick {
+                position: absolute;
+                right: 50px;
+                bottom: 50px;
+                width: 120px;
+                height: 120px;
+                border: 3px solid #ff6666;
+                border-radius: 60px;
+                opacity: 0.7;
+                display: none;
+                background: rgba(255, 0, 0, 0.1);
+                box-shadow: 0 0 15px #ff3333;
+            }
+            #knob {
+                position: absolute;
+                left: 20px;
+                top: 20px;
+                width: 80px;
+                height: 80px;
+                border-radius: 40px;
+                background: linear-gradient(45deg, #ff3333, #ff6666);
+                box-shadow: 0 0 10px #ff3333;
+            }
+            #ui {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                color: #ff6666;
+                background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 14px;
+                min-width: 220px;
+                border: 2px solid #ff3333;
+                box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
+                font-weight: 700;
+            }
+            #initials {
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                padding: 10px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
+                border: 2px solid #ff3333;
+                color: #ff6666;
+                font-size: 14px;
+                font-family: 'Orbitron', monospace;
+                font-weight: 700;
+                box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
+            }
+            #initials::placeholder {
+                color: #ff9999;
+            }
+            #controls {
+                position: fixed;
+                bottom: 10px;
+                right: 10px;
+                color: #ff9999;
+                font-size: 12px;
+                text-align: right;
+                font-family: 'Orbitron', monospace;
+                text-shadow: 0 0 5px #ff3333;
+            }
+            #title {
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                font-family: 'Orbitron', monospace;
+                font-weight: 900;
+                font-size: 24px;
+                color: #ff3333;
+                text-shadow: 0 0 10px #ff3333, 0 0 20px #ff6666;
+                letter-spacing: 3px;
+            }
+            .status-dead {
+                color: #ff0000 !important;
+                text-shadow: 0 0 10px #ff0000;
+                animation: pulse 1s infinite;
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/@multisynq/client@1.0.1/bundled/multisynq-client.min.js"></script>
+    </head>
+    <body>
+        <div id="title">DOOM ARENA</div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="joystick"><div id="knob"></div></div>
+        <div id="ui">
+            <div id="status">Connecting...</div>
+            <div id="queue"></div>
+        </div>
+        <input id="initials" type="text" maxlength="10" size="10" placeholder="Enter Name">
+        <div id="controls">
+            WASD: Move | Mouse: Aim<br>
+            CLICK/SPACE: Shoot | Mobile: Touch controls
+        </div>
+        <script>
+
+// Sound effects using Web Audio API
+class SoundManager {
+    constructor() {
+        this.audioContext = null;
+        this.sounds = {};
+        this.enabled = false;
+        this.init();
+    }
+
+    async init() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.enabled = true;
+            this.createSounds();
+        } catch (e) {
+            console.log('Audio not supported');
+        }
+    }
+
+    createSounds() {
+        // Gunshot sound
+        this.sounds.shoot = this.createGunshot();
+        // Hit sound
+        this.sounds.hit = this.createHit();
+        // Death sound
+        this.sounds.death = this.createDeath();
+    }
+
+    createGunshot() {
+        return () => {
+            if (!this.enabled) return;
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(150, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, this.audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+            
+            oscillator.type = 'sawtooth';
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + 0.1);
+        };
+    }
+
+    createHit() {
+        return () => {
+            if (!this.enabled) return;
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(200, this.audioContext.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+            
+            oscillator.type = 'square';
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + 0.2);
+        };
+    }
+
+    createDeath() {
+        return () => {
+            if (!this.enabled) return;
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(50, this.audioContext.currentTime + 0.8);
+            
+            gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.8);
+            
+            oscillator.type = 'sawtooth';
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + 0.8);
+        };
+    }
+
+    play(soundName) {
+        if (this.sounds[soundName]) {
+            this.sounds[soundName]();
+        }
+    }
+
+    enable() {
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+        }
+    }
+}
+
+const soundManager = new SoundManager();
+
+// Constants for the game
+const C = Multisynq.Constants;
+C.PLAYER_SPEED = 3;
+C.PLAYER_SIZE = 8;
+C.BULLET_SPEED = 12;
+C.BULLET_SIZE = 2;
+C.BULLET_LIFETIME = 60; // frames
+C.MAX_ACTIVE_PLAYERS = 8; // Increased from 4 to 8
+C.RESPAWN_TIME = 300; // 5 seconds at 60fps
+C.MAP_WIDTH = 800;
+C.MAP_HEIGHT = 600;
+C.WALL_THICKNESS = 20;
+C.MONSTER_SPEED = 1.5;
+C.MONSTER_SIZE = 15;
+C.MONSTER_HEALTH = 300;
+C.MONSTER_DAMAGE = 75;
+C.SMALL_MONSTER_SPEED = 2;
+C.SMALL_MONSTER_SIZE = 10;
+C.SMALL_MONSTER_HEALTH = 150;
+C.SMALL_MONSTER_DAMAGE = 37; // Half damage, kills in 2 hits
+C.KNOCKBACK_FORCE = 8;
+C.INVINCIBILITY_FRAMES = 90; // 1.5 seconds at 60fps
+C.POWERUP_DURATION = 600; // 10 seconds at 60fps
+C.POWERUP_SPAWN_CHANCE = 0.7; // 70% chance for imp to drop powerup
+C.POWERUP_LIFETIME = 1800; // 30 seconds before disappearing
+
+// Game root model
+class Game extends Multisynq.Model {
+    init(_, persisted) {
+        this.players = new Map(); // active players
+        this.queue = []; // waiting players
+        this.bullets = new Set();
+        this.walls = new Set();
+        this.monsters = new Set();
+        this.powerups = new Set();
+        this.scores = persisted?.scores ?? {};
+        
+        this.subscribe(this.sessionId, "view-join", this.viewJoined);
+        this.subscribe(this.sessionId, "view-exit", this.viewExited);
+        
+        this.createWalls();
+        this.spawnMonster();
+        this.mainLoop();
+    }
+
+    createWalls() {
+        // Create strategic wall layout - more Doom-like
+        const walls = [
+            // Outer walls
+            {x: 0, y: 0, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // top
+            {x: 0, y: C.MAP_HEIGHT - C.WALL_THICKNESS, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // bottom
+            {x: 0, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // left
+            {x: C.MAP_WIDTH - C.WALL_THICKNESS, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // right
+            
+            // Central cross structure
+            {x: 350, y: 200, w: 100, h: C.WALL_THICKNESS}, // horizontal center
+            {x: 380, y: 150, w: C.WALL_THICKNESS, h: 100}, // vertical center
+            
+            // Corner bunkers
+            {x: 100, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-left bunker
+            {x: 100, y: 100, w: C.WALL_THICKNESS, h: 80},
+            {x: 620, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-right bunker
+            {x: 680, y: 100, w: C.WALL_THICKNESS, h: 80},
+            {x: 100, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-left bunker
+            {x: 100, y: 480, w: C.WALL_THICKNESS, h: 80},
+            {x: 620, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-right bunker
+            {x: 680, y: 480, w: C.WALL_THICKNESS, h: 80},
+            
+            // Side corridors
+            {x: 250, y: 350, w: C.WALL_THICKNESS, h: 100}, // left corridor
+            {x: 530, y: 350, w: C.WALL_THICKNESS, h: 100}, // right corridor
+        ];
+        
+        walls.forEach(wall => Wall.create(wall));
+    }
+
+    spawnMonster() {
+        // Spawn large monster in center area
+        Monster.create({
+            x: C.MAP_WIDTH / 2,
+            y: C.MAP_HEIGHT / 2,
+            isLarge: true
+        });
+    }
+
+    viewJoined(viewId) {
+        if (this.players.size < C.MAX_ACTIVE_PLAYERS) {
+            this.addActivePlayer(viewId);
+        } else {
+            this.queue.push(viewId);
+        }
+    }
+
+    viewExited(viewId) {
+        if (this.players.has(viewId)) {
+            this.players.get(viewId).destroy();
+            this.players.delete(viewId);
+            this.processQueue();
+        } else {
+            const queueIndex = this.queue.indexOf(viewId);
+            if (queueIndex !== -1) {
+                this.queue.splice(queueIndex, 1);
+            }
+        }
+    }
+
+    addActivePlayer(viewId) {
+        const spawnPoint = this.getRandomSpawnPoint();
+        const player = Player.create({ 
+            viewId, 
+            x: spawnPoint.x, 
+            y: spawnPoint.y 
+        });
+        this.players.set(viewId, player);
+    }
+
+    processQueue() {
+        if (this.queue.length > 0 && this.players.size < C.MAX_ACTIVE_PLAYERS) {
+            const nextViewId = this.queue.shift();
+            this.addActivePlayer(nextViewId);
+        }
+    }
+
+    getRandomSpawnPoint() {
+        // Generate random spawn points away from walls and monsters
+        let attempts = 0;
+        while (attempts < 50) {
+            const x = 50 + Math.random() * (C.MAP_WIDTH - 100);
+            const y = 50 + Math.random() * (C.MAP_HEIGHT - 100);
+            
+            // Check if spawn point is safe (not in walls or too close to monsters)
+            if (this.isSpawnPointSafe(x, y)) {
+                return {x, y};
+            }
+            attempts++;
+        }
+        
+        // Fallback to corner spawns if random fails
+        const corners = [
+            {x: 60, y: 60},
+            {x: C.MAP_WIDTH - 60, y: 60},
+            {x: 60, y: C.MAP_HEIGHT - 60},
+            {x: C.MAP_WIDTH - 60, y: C.MAP_HEIGHT - 60},
+            {x: C.MAP_WIDTH / 2, y: 60},
+            {x: C.MAP_WIDTH / 2, y: C.MAP_HEIGHT - 60},
+            {x: 60, y: C.MAP_HEIGHT / 2},
+            {x: C.MAP_WIDTH - 60, y: C.MAP_HEIGHT / 2}
+        ];
+        return corners[Math.floor(Math.random() * corners.length)];
+    }
+
+    isSpawnPointSafe(x, y) {
+        // Check walls
+        for (const wall of this.walls) {
+            if (x - C.PLAYER_SIZE < wall.x + wall.w &&
+                x + C.PLAYER_SIZE > wall.x &&
+                y - C.PLAYER_SIZE < wall.y + wall.h &&
+                y + C.PLAYER_SIZE > wall.y) {
+                return false;
+            }
+        }
+        
+        // Check distance from monsters
+        for (const monster of this.monsters) {
+            if (monster.dead) continue;
+            const dx = x - monster.x;
+            const dy = y - monster.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 100) return false; // Stay away from monsters
+        }
+        
+        return true;
+    }
+
+    playerKilled(killedPlayer, killerPlayer) {
+        if (killerPlayer) {
+            killerPlayer.score++;
+            if (killerPlayer.name) {
+                this.scores[killerPlayer.name] = Math.max(
+                    this.scores[killerPlayer.name] || 0, 
+                    killerPlayer.score
+                );
+                this.persistSession({ scores: this.scores });
+            }
+        }
+        
+        // Remove killed player and add to queue
+        this.players.delete(killedPlayer.viewId);
+        this.queue.push(killedPlayer.viewId);
+        killedPlayer.destroy();
+        
+        // Process queue after respawn delay
+        this.future(C.RESPAWN_TIME).processQueue();
+    }
+
+    monsterKilled(monster) {
+        if (monster.isLarge) {
+            // Spawn 2 smaller monsters
+            const angle1 = Math.random() * Math.PI * 2;
+            const angle2 = angle1 + Math.PI + (Math.random() - 0.5) * Math.PI; // Opposite direction with some variance
+            
+            const distance = 50;
+            
+            Monster.create({
+                x: monster.x + Math.cos(angle1) * distance,
+                y: monster.y + Math.sin(angle1) * distance,
+                isLarge: false
+            });
+            
+            Monster.create({
+                x: monster.x + Math.cos(angle2) * distance,
+                y: monster.y + Math.sin(angle2) * distance,
+                isLarge: false
+            });
+        } else {
+            // Small monster (imp) has chance to drop powerup
+            if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
+                this.spawnPowerup(monster.x, monster.y);
+            }
+        }
+        
+        // Check if all monsters are dead
+        const aliveMonsters = Array.from(this.monsters).filter(m => !m.dead);
+        if (aliveMonsters.length === 0) {
+            // Respawn large monster after delay
+            this.future(15000).spawnMonster(); // 15 seconds
+        }
+    }
+
+    spawnPowerup(x, y) {
+        const types = ['speed', 'rapidfire', 'shield', 'damage'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        Powerup.create({
+            x: x + (Math.random() - 0.5) * 40, // Slight random offset
+            y: y + (Math.random() - 0.5) * 40,
+            type: type
+        });
+    }
+
+    mainLoop() {
+        for (const player of this.players.values()) {
+            player.update();
+        }
+        for (const bullet of this.bullets) {
+            bullet.update();
+        }
+        for (const monster of this.monsters) {
+            if (!monster.dead) {
+                monster.update();
+            }
+        }
+        for (const powerup of this.powerups) {
+            powerup.update();
+        }
+        this.checkCollisions();
+        this.future(16).mainLoop(); // ~60fps
+    }
+
+    checkCollisions() {
+        // Bullet vs Player collisions
+        for (const bullet of this.bullets) {
+            if (bullet.destroyed) continue;
+            
+            for (const player of this.players.values()) {
+                if (player.viewId === bullet.shooterId || player.dead) continue;
+                
+                const dx = bullet.x - player.x;
+                const dy = bullet.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < C.PLAYER_SIZE + C.BULLET_SIZE) {
+                    const shooter = this.players.get(bullet.shooterId);
+                    player.takeDamage(bullet.damage || 50);
+                    bullet.destroy();
+                    
+                    if (player.dead) {
+                        this.playerKilled(player, shooter);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Bullet vs Monster collisions
+        for (const monster of this.monsters) {
+            if (monster.dead) continue;
+            
+            for (const bullet of this.bullets) {
+                if (bullet.destroyed) continue;
+                
+                const dx = bullet.x - monster.x;
+                const dy = bullet.y - monster.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < monster.size + C.BULLET_SIZE) {
+                    monster.takeDamage(bullet.damage || 25); // Monster takes less damage per bullet
+                    bullet.destroy();
+                    
+                    if (monster.dead) {
+                        // Award points to all active players
+                        const points = monster.isLarge ? 10 : 5;
+                        for (const player of this.players.values()) {
+                            player.score += points;
+                        }
+                        this.monsterKilled(monster);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Monster vs Player collisions
+        for (const monster of this.monsters) {
+            if (monster.dead) continue;
+            
+            for (const player of this.players.values()) {
+                if (player.dead || player.invincible > 0) continue;
+                
+                const dx = monster.x - player.x;
+                const dy = monster.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < monster.size + C.PLAYER_SIZE) {
+                    // Apply knockback
+                    const knockbackAngle = Math.atan2(player.y - monster.y, player.x - monster.x);
+                    player.knockback(knockbackAngle, C.KNOCKBACK_FORCE);
+                    
+                    player.takeDamage(monster.damage);
+                    
+                    if (player.dead) {
+                        this.playerKilled(player, null); // No killer for monster kills
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Player vs Powerup collisions
+        for (const powerup of this.powerups) {
+            if (powerup.destroyed) continue;
+            
+            for (const player of this.players.values()) {
+                if (player.dead) continue;
+                
+                const dx = powerup.x - player.x;
+                const dy = powerup.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < C.PLAYER_SIZE + 10) { // Powerup pickup radius
+                    player.applyPowerup(powerup.type);
+                    powerup.destroy();
+                    break;
+                }
+            }
+        }
+        
+        // Bullet vs Wall collisions
+        for (const bullet of this.bullets) {
+            if (bullet.destroyed) continue;
+            
+            for (const wall of this.walls) {
+                if (this.bulletWallCollision(bullet, wall)) {
+                    bullet.destroy();
+                    break;
+                }
+            }
+        }
+    }
+
+    bulletWallCollision(bullet, wall) {
+        return bullet.x >= wall.x && 
+               bullet.x <= wall.x + wall.w &&
+               bullet.y >= wall.y && 
+               bullet.y <= wall.y + wall.h;
+    }
+}
+Game.register("Game");
+
+class GameObject extends Multisynq.Model {
+    get game() { return this.wellKnownModel("modelRoot"); }
+    
+    init() {
+        this.x = 0;
+        this.y = 0;
+        this.destroyed = false;
+    }
+}
+
+class Wall extends GameObject {
+    init({x, y, w, h}) {
+        super.init();
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.game.walls.add(this);
+    }
+    
+    destroy() {
+        this.game.walls.delete(this);
+        super.destroy();
+    }
+}
+Wall.register("Wall");
+
+class Monster extends GameObject {
+    init({x, y, isLarge}) {
+        super.init();
+        this.x = x;
+        this.y = y;
+        this.isLarge = isLarge;
+        
+        if (isLarge) {
+            this.health = C.MONSTER_HEALTH;
+            this.maxHealth = C.MONSTER_HEALTH;
+            this.speed = C.MONSTER_SPEED;
+            this.size = C.MONSTER_SIZE;
+            this.damage = C.MONSTER_DAMAGE;
+        } else {
+            this.health = C.SMALL_MONSTER_HEALTH;
+            this.maxHealth = C.SMALL_MONSTER_HEALTH;
+            this.speed = C.SMALL_MONSTER_SPEED;
+            this.size = C.SMALL_MONSTER_SIZE;
+            this.damage = C.SMALL_MONSTER_DAMAGE;
+        }
+        
+        this.dead = false;
+        this.target = null;
+        this.lastDamageTime = 0;
+        this.game.monsters.add(this);
+    }
+
+    update() {
+        if (this.dead) return;
+        
+        // Find closest player to chase
+        let closestPlayer = null;
+        let closestDist = Infinity;
+        
+        for (const player of this.game.players.values()) {
+            if (player.dead) continue;
+            
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestPlayer = player;
+            }
+        }
+        
+        // Move towards closest player
+        if (closestPlayer) {
+            const dx = closestPlayer.x - this.x;
+            const dy = closestPlayer.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 0) {
+                const moveX = (dx / dist) * this.speed;
+                const moveY = (dy / dist) * this.speed;
+                
+                // Check wall collisions before moving
+                if (!this.wouldCollideWithWalls(this.x + moveX, this.y)) {
+                    this.x += moveX;
+                }
+                if (!this.wouldCollideWithWalls(this.x, this.y + moveY)) {
+                    this.y += moveY;
+                }
+            }
+        }
+        
+        // Keep in bounds
+        this.x = Math.max(this.size, Math.min(C.MAP_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(C.MAP_HEIGHT - this.size, this.y));
+    }
+
+    wouldCollideWithWalls(x, y) {
+        for (const wall of this.game.walls) {
+            if (x - this.size < wall.x + wall.w &&
+                x + this.size > wall.x &&
+                y - this.size < wall.y + wall.h &&
+                y + this.size > wall.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    takeDamage(amount) {
+        this.health -= amount;
+        this.lastDamageTime = this.now();
+        this.game.publish(this.game.sessionId, "sound", {type: "hit", viewId: "monster"});
+        
+        if (this.health <= 0) {
+            this.health = 0;
+            this.dead = true;
+            this.game.publish(this.game.sessionId, "sound", {type: "death", viewId: "monster"});
+        }
+    }
+
+    destroy() {
+        this.game.monsters.delete(this);
+        super.destroy();
+    }
+}
+Monster.register("Monster");
+
+class Powerup extends GameObject {
+    init({x, y, type}) {
+        super.init();
+        this.x = x;
+        this.y = y;
+        this.type = type; // 'speed', 'rapidfire', 'shield', 'damage'
+        this.lifetime = C.POWERUP_LIFETIME;
+        this.bobOffset = Math.random() * Math.PI * 2; // For floating animation
+        this.game.powerups.add(this);
+    }
+
+    update() {
+        this.lifetime--;
+        if (this.lifetime <= 0) {
+            this.destroy();
+        }
+    }
+
+    destroy() {
+        this.destroyed = true;
+        this.game.powerups.delete(this);
+        super.destroy();
+    }
+}
+Powerup.register("Powerup");
+
+class Player extends GameObject {
+    init({viewId, x, y}) {
+        super.init();
+        this.viewId = viewId;
+        this.x = x;
+        this.y = y;
+        this.angle = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.health = 100;
+        this.score = 0;
+        this.name = '';
+        this.dead = false;
+        this.lastShot = 0;
+        this.invincible = 0; // Invincibility frames
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+        
+        // Powerup effects
+        this.speedBoost = 0;
+        this.rapidFire = 0;
+        this.shield = 0;
+        this.damageBoost = 0;
+        
+        // Input state
+        this.keys = {up: false, down: false, left: false, right: false};
+        
+        this.subscribe(viewId, "move", this.handleMove);
+        this.subscribe(viewId, "aim", this.handleAim);
+        this.subscribe(viewId, "shoot", this.handleShoot);
+        this.subscribe(viewId, "set-name", this.setName);
+        this.subscribe(viewId, "sound", this.handleSound);
+    }
+
+    handleMove({up, down, left, right}) {
+        this.keys = {up, down, left, right};
+    }
+
+    handleAim({angle}) {
+        this.angle = angle;
+    }
+
+    handleShoot() {
+        const shootCooldown = this.rapidFire > 0 ? 100 : 200; // Faster shooting with rapid fire
+        if (this.dead || this.now() - this.lastShot < shootCooldown) return;
+        
+        this.lastShot = this.now();
+        const bulletX = this.x + Math.cos(this.angle) * C.PLAYER_SIZE;
+        const bulletY = this.y + Math.sin(this.angle) * C.PLAYER_SIZE;
+        
+        const bulletDamage = this.damageBoost > 0 ? 75 : 50; // Increased damage with powerup
+        
+        Bullet.create({
+            x: bulletX,
+            y: bulletY,
+            vx: Math.cos(this.angle) * C.BULLET_SPEED,
+            vy: Math.sin(this.angle) * C.BULLET_SPEED,
+            shooterId: this.viewId,
+            damage: bulletDamage
+        });
+        
+        // Broadcast sound to all players
+        this.publish(this.game.sessionId, "sound", {type: "shoot", viewId: this.viewId});
+    }
+
+    handleSound({type, viewId}) {
+        // This will be handled by the view
+    }
+
+    setName(name) {
+        if (!name || name.length === 0) return;
+        this.name = name;
+    }
+
+    applyPowerup(type) {
+        switch(type) {
+            case 'speed':
+                this.speedBoost = C.POWERUP_DURATION;
+                break;
+            case 'rapidfire':
+                this.rapidFire = C.POWERUP_DURATION;
+                break;
+            case 'shield':
+                this.shield = C.POWERUP_DURATION;
+                break;
+            case 'damage':
+                this.damageBoost = C.POWERUP_DURATION;
+                break;
+        }
+        
+        // Play powerup sound
+        this.publish(this.game.sessionId, "sound", {type: "hit", viewId: this.viewId}); // Reuse hit sound for powerup
+    }
+
+    knockback(angle, force) {
+        this.knockbackVx = Math.cos(angle) * force;
+        this.knockbackVy = Math.sin(angle) * force;
+        this.invincible = C.INVINCIBILITY_FRAMES;
+    }
+
+    update() {
+        if (this.dead) return;
+        
+        // Reduce invincibility frames
+        if (this.invincible > 0) {
+            this.invincible--;
+        }
+        
+        // Update powerup timers
+        if (this.speedBoost > 0) this.speedBoost--;
+        if (this.rapidFire > 0) this.rapidFire--;
+        if (this.shield > 0) this.shield--;
+        if (this.damageBoost > 0) this.damageBoost--;
+        
+        // Apply movement
+        this.vx = 0;
+        this.vy = 0;
+        
+        const currentSpeed = this.speedBoost > 0 ? C.PLAYER_SPEED * 1.5 : C.PLAYER_SPEED;
+        
+        if (this.keys.up) this.vy -= currentSpeed;
+        if (this.keys.down) this.vy += currentSpeed;
+        if (this.keys.left) this.vx -= currentSpeed;
+        if (this.keys.right) this.vx += currentSpeed;
+        
+        // Normalize diagonal movement
+        if (this.vx !== 0 && this.vy !== 0) {
+            const factor = 0.707; // 1/sqrt(2)
+            this.vx *= factor;
+            this.vy *= factor;
+        }
+        
+        // Apply knockback
+        this.vx += this.knockbackVx;
+        this.vy += this.knockbackVy;
+        
+        // Reduce knockback over time
+        this.knockbackVx *= 0.85;
+        this.knockbackVy *= 0.85;
+        
+        // Check wall collisions before moving
+        const newX = this.x + this.vx;
+        const newY = this.y + this.vy;
+        
+        if (!this.wouldCollideWithWalls(newX, this.y)) {
+            this.x = newX;
+        }
+        if (!this.wouldCollideWithWalls(this.x, newY)) {
+            this.y = newY;
+        }
+        
+        // Keep in bounds
+        this.x = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_WIDTH - C.PLAYER_SIZE, this.x));
+        this.y = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_HEIGHT - C.PLAYER_SIZE, this.y));
+    }
+
+    wouldCollideWithWalls(x, y) {
+        for (const wall of this.game.walls) {
+            if (x - C.PLAYER_SIZE < wall.x + wall.w &&
+                x + C.PLAYER_SIZE > wall.x &&
+                y - C.PLAYER_SIZE < wall.y + wall.h &&
+                y + C.PLAYER_SIZE > wall.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    takeDamage(amount = 50) {
+        // Shield reduces damage by half
+        if (this.shield > 0) {
+            amount = Math.floor(amount / 2);
+        }
+        
+        this.health -= amount;
+        this.publish(this.game.sessionId, "sound", {type: "hit", viewId: this.viewId});
+        
+        if (this.health <= 0) {
+            this.health = 0;
+            this.dead = true;
+            this.publish(this.game.sessionId, "sound", {type: "death", viewId: this.viewId});
+        }
+    }
+
+    destroy() {
+        this.game.players.delete(this.viewId);
+        super.destroy();
+    }
+}
+Player.register("Player");
+
+class Bullet extends GameObject {
+    init({x, y, vx, vy, shooterId, damage}) {
+        super.init();
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.shooterId = shooterId;
+        this.damage = damage || 50;
+        this.lifetime = C.BULLET_LIFETIME;
+        this.game.bullets.add(this);
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.lifetime--;
+        
+        // Remove if out of bounds or lifetime expired
+        if (this.lifetime <= 0 || 
+            this.x < 0 || this.x > C.MAP_WIDTH ||
+            this.y < 0 || this.y > C.MAP_HEIGHT) {
+            this.destroy();
+        }
+    }
+
+    destroy() {
+        this.destroyed = true;
+        this.game.bullets.delete(this);
+        super.destroy();
+    }
+}
+Bullet.register("Bullet");
+
+/////////// View Code ///////////
+
+class GameView extends Multisynq.View {
+    constructor(model) {
+        super(model);
+        this.model = model;
+        this.canvas = document.getElementById("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.keys = {up: false, down: false, left: false, right: false};
+        
+        this.setupControls();
+        this.smoothing = new WeakMap();
+        
+        // Subscribe to sound events
+        this.subscribe(this.model.sessionId, "sound", this.handleSound);
+        
+        // Enable audio on first user interaction
+        document.addEventListener('click', () => soundManager.enable(), {once: true});
+        document.addEventListener('keydown', () => soundManager.enable(), {once: true});
+    }
+
+    handleSound({type, viewId}) {
+        soundManager.play(type);
+    }
+
+    setupControls() {
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            this.handleKeyChange(e.code, true);
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            this.handleKeyChange(e.code, false);
+        });
+        
+        // Mouse controls with proper offset calculation
+        this.canvas.addEventListener('mousemove', (e) => {
+            this.updateMousePosition(e);
+            this.updateAim();
+        });
+        
+        this.canvas.addEventListener('click', () => {
+            this.publish(this.viewId, "shoot");
+        });
+        
+        // Touch controls
+        this.setupTouchControls();
+        
+        // Name input
+        const initials = document.getElementById('initials');
+        initials.addEventListener('change', () => {
+            this.publish(this.viewId, "set-name", initials.value);
+        });
+        
+        initials.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                initials.blur();
+            }
+        });
+    }
+
+    updateMousePosition(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        
+        this.mouseX = (e.clientX - rect.left) * scaleX;
+        this.mouseY = (e.clientY - rect.top) * scaleY;
+    }
+
+    handleKeyChange(code, pressed) {
+        let changed = false;
+        
+        switch(code) {
+            case 'KeyW':
+            case 'ArrowUp':
+                if (this.keys.up !== pressed) {
+                    this.keys.up = pressed;
+                    changed = true;
+                }
+                break;
+            case 'KeyS':
+            case 'ArrowDown':
+                if (this.keys.down !== pressed) {
+                    this.keys.down = pressed;
+                    changed = true;
+                }
+                break;
+            case 'KeyA':
+            case 'ArrowLeft':
+                if (this.keys.left !== pressed) {
+                    this.keys.left = pressed;
+                    changed = true;
+                }
+                break;
+            case 'KeyD':
+            case 'ArrowRight':
+                if (this.keys.right !== pressed) {
+                    this.keys.right = pressed;
+                    changed = true;
+                }
+                break;
+            case 'Space':
+                if (pressed) {
+                    this.publish(this.viewId, "shoot");
+                }
+                break;
+        }
+        
+        if (changed) {
+            this.publish(this.viewId, "move", this.keys);
+        }
+    }
+
+    updateAim() {
+        const player = this.model.players.get(this.viewId);
+        if (!player) return;
+        
+        const dx = this.mouseX - player.x;
+        const dy = this.mouseY - player.y;
+        const angle = Math.atan2(dy, dx);
+        
+        this.publish(this.viewId, "aim", {angle});
+    }
+
+    setupTouchControls() {
+        const joystick = document.getElementById("joystick");
+        const knob = document.getElementById("knob");
+        
+        let touchId = null;
+        let centerX = 0, centerY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            if (touchId === null && e.touches.length > 0) {
+                const touch = e.touches[0];
+                touchId = touch.identifier;
+                centerX = touch.clientX;
+                centerY = touch.clientY;
+                
+                joystick.style.left = `${centerX - 60}px`;
+                joystick.style.top = `${centerY - 60}px`;
+                joystick.style.display = "block";
+            }
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let touch of e.touches) {
+                if (touch.identifier === touchId) {
+                    const dx = touch.clientX - centerX;
+                    const dy = touch.clientY - centerY;
+                    
+                    const maxDistance = 30;
+                    const clampedDx = Math.max(-maxDistance, Math.min(maxDistance, dx));
+                    const clampedDy = Math.max(-maxDistance, Math.min(maxDistance, dy));
+                    
+                    knob.style.left = `${20 + clampedDx}px`;
+                    knob.style.top = `${20 + clampedDy}px`;
+                    
+                    // Update movement
+                    const newKeys = {
+                        up: clampedDy < -10,
+                        down: clampedDy > 10,
+                        left: clampedDx < -10,
+                        right: clampedDx > 10
+                    };
+                    
+                    if (JSON.stringify(newKeys) !== JSON.stringify(this.keys)) {
+                        this.keys = newKeys;
+                        this.publish(this.viewId, "move", this.keys);
+                    }
+                    break;
+                }
+            }
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === touchId) {
+                    touchId = null;
+                    joystick.style.display = "none";
+                    knob.style.left = "20px";
+                    knob.style.top = "20px";
+                    
+                    // Stop movement
+                    this.keys = {up: false, down: false, left: false, right: false};
+                    this.publish(this.viewId, "move", this.keys);
+                    
+                    // Shoot on touch end
+                    this.publish(this.viewId, "shoot");
+                    break;
+                }
+            }
+        });
+    }
+
+    update() {
+        this.render();
+        this.updateUI();
+    }
+
+    render() {
+        this.ctx.clearRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
+        
+        // Draw walls with Doom-style shading
+        this.ctx.fillStyle = "#444";
+        for (const wall of this.model.walls) {
+            this.ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+            // Add highlight edge
+            this.ctx.fillStyle = "#666";
+            this.ctx.fillRect(wall.x, wall.y, wall.w, 2);
+            this.ctx.fillRect(wall.x, wall.y, 2, wall.h);
+            this.ctx.fillStyle = "#444";
+        }
+        
+        // Draw powerups
+        for (const powerup of this.model.powerups) {
+            this.drawPowerup(powerup);
+        }
+        
+        // Draw monsters
+        for (const monster of this.model.monsters) {
+            if (!monster.dead) {
+                this.drawMonster(monster);
+            }
+        }
+        
+        // Draw players
+        for (const player of this.model.players.values()) {
+            this.drawPlayer(player);
+        }
+        
+        // Draw bullets with glow effect
+        for (const bullet of this.model.bullets) {
+            this.drawBullet(bullet);
+        }
+    }
+
+    drawPowerup(powerup) {
+        const time = this.now() / 100; // For animation
+        const bobY = Math.sin(time + powerup.bobOffset) * 3; // Floating animation
+        
+        const colors = {
+            speed: '#00ffff',    // Cyan
+            rapidfire: '#ffff00', // Yellow
+            shield: '#00ff00',   // Green
+            damage: '#ff6600'    // Orange
+        };
+        
+        const symbols = {
+            speed: '⚡',
+            rapidfire: '🔥',
+            shield: '🛡️',
+            damage: '💥'
+        };
+        
+        const color = colors[powerup.type] || '#ffffff';
+        
+        // Glow effect
+        this.ctx.shadowColor = color;
+        this.ctx.shadowBlur = 15;
+        
+        // Powerup circle
+        this.ctx.fillStyle = color;
+        this.ctx.beginPath();
+        this.ctx.arc(powerup.x, powerup.y + bobY, 8, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Inner circle
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(powerup.x, powerup.y + bobY, 5, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        this.ctx.shadowBlur = 0;
+        
+        // Symbol
+        this.ctx.fillStyle = color;
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(symbols[powerup.type] || '?', powerup.x, powerup.y + bobY + 4);
+    }
+
+    drawMonster(monster) {
+        const glowColor = monster.isLarge ? "#ff0066" : "#ff6600";
+        const bodyColor = monster.isLarge ? "#cc0044" : "#cc4400";
+        const coreColor = monster.isLarge ? "#ff0066" : "#ff6600";
+        const label = monster.isLarge ? "DEMON" : "IMP";
+        
+        // Monster body with menacing glow
+        this.ctx.shadowColor = glowColor;
+        this.ctx.shadowBlur = monster.isLarge ? 20 : 15;
+        this.ctx.fillStyle = bodyColor;
+        this.ctx.beginPath();
+        this.ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Inner core
+        this.ctx.shadowBlur = monster.isLarge ? 10 : 8;
+        this.ctx.fillStyle = coreColor;
+        this.ctx.beginPath();
+        this.ctx.arc(monster.x, monster.y, monster.size * 0.7, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        this.ctx.shadowBlur = 0;
+        
+        // Health bar
+        const barWidth = monster.isLarge ? 40 : 30;
+        const barHeight = monster.isLarge ? 8 : 6;
+        const barX = monster.x - barWidth / 2;
+        const barY = monster.y - monster.size - 15;
+        
+        // Background
+        this.ctx.fillStyle = "#330000";
+        this.ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+        
+        // Health bar
+        const healthPercent = monster.health / monster.maxHealth;
+        this.ctx.fillStyle = "#ff0000";
+        this.ctx.fillRect(barX, barY, healthPercent * barWidth, barHeight);
+        
+        // Monster label
+        this.ctx.shadowColor = glowColor;
+        this.ctx.shadowBlur = 3;
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.font = `bold ${monster.isLarge ? 10 : 8}px Orbitron, monospace`;
+        this.ctx.textAlign = "center";
+        this.ctx.fillText(label, monster.x, monster.y + monster.size + 25);
+        this.ctx.shadowBlur = 0;
+    }
+
+    drawBullet(bullet) {
+        // Enhanced bullets for damage boost
+        const isDamageBoost = bullet.damage > 50;
+        const glowColor = isDamageBoost ? "#ff6600" : "#ffff00";
+        const coreColor = isDamageBoost ? "#ff3300" : "#ffffff";
+        
+        // Glow effect
+        this.ctx.shadowColor = glowColor;
+        this.ctx.shadowBlur = isDamageBoost ? 15 : 10;
+        this.ctx.fillStyle = glowColor;
+        this.ctx.beginPath();
+        this.ctx.arc(bullet.x, bullet.y, C.BULLET_SIZE + (isDamageBoost ? 2 : 1), 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Core bullet
+        this.ctx.shadowBlur = 0;
+        this.ctx.fillStyle = coreColor;
+        this.ctx.beginPath();
+        this.ctx.arc(bullet.x, bullet.y, C.BULLET_SIZE, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawPlayer(player) {
+        const isMe = player.viewId === this.viewId;
+        
+        // Invincibility flashing effect
+        if (player.invincible > 0 && Math.floor(player.invincible / 5) % 2 === 0) {
+            return; // Skip drawing every 5 frames for flashing effect
+        }
+        
+        // Player body with glow and powerup effects
+        if (!player.dead) {
+            let glowColor = isMe ? "#00ff00" : "#ff0000";
+            
+            // Powerup glow effects
+            if (player.speedBoost > 0) glowColor = "#00ffff";
+            else if (player.rapidFire > 0) glowColor = "#ffff00";
+            else if (player.shield > 0) glowColor = "#00ff00";
+            else if (player.damageBoost > 0) glowColor = "#ff6600";
+            
+            this.ctx.shadowColor = glowColor;
+            this.ctx.shadowBlur = 15;
+        } else {
+            this.ctx.shadowColor = "#666";
+            this.ctx.shadowBlur = 5;
+        }
+        
+        this.ctx.fillStyle = player.dead ? "#666" : (isMe ? "#00ff00" : "#ff3333");
+        this.ctx.beginPath();
+        this.ctx.arc(player.x, player.y, C.PLAYER_SIZE, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        this.ctx.shadowBlur = 0;
+        
+        if (!player.dead) {
+            // Direction indicator with glow
+            this.ctx.shadowColor = "#ffffff";
+            this.ctx.shadowBlur = 5;
+            this.ctx.strokeStyle = "#ffffff";
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(player.x, player.y);
+            this.ctx.lineTo(
+                player.x + Math.cos(player.angle) * C.PLAYER_SIZE * 1.5,
+                player.y + Math.sin(player.angle) * C.PLAYER_SIZE * 1.5
+            );
+            this.ctx.stroke();
+            this.ctx.shadowBlur = 0;
+        }
+        
+        // Health bar with Doom styling
+        if (!player.dead) {
+            const barWidth = 24;
+            const barHeight = 6;
+            const barX = player.x - barWidth / 2;
+            const barY = player.y - C.PLAYER_SIZE - 12;
+            
+            // Background
+            this.ctx.fillStyle = "#330000";
+            this.ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+            
+            // Health bar
+            const healthPercent = player.health / 100;
+            const healthColor = healthPercent > 0.6 ? "#00ff00" : 
+                               healthPercent > 0.3 ? "#ffff00" : "#ff0000";
+            
+            this.ctx.fillStyle = healthColor;
+            this.ctx.fillRect(barX, barY, healthPercent * barWidth, barHeight);
+        }
+        
+        // Name and score with glow
+        this.ctx.shadowColor = isMe ? "#00ff00" : "#ff3333";
+        this.ctx.shadowBlur = 3;
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.font = "bold 12px Orbitron, monospace";
+        this.ctx.textAlign = "center";
+        const name = player.name || `Marine ${Array.from(this.model.players.keys()).indexOf(player.viewId) + 1}`;
+        this.ctx.fillText(`${name} [${player.score}]`, player.x, player.y + C.PLAYER_SIZE + 20);
+        this.ctx.shadowBlur = 0;
+        
+        // Powerup indicators
+        if (isMe && !player.dead) {
+            let powerupText = '';
+            if (player.speedBoost > 0) powerupText += '⚡ ';
+            if (player.rapidFire > 0) powerupText += '🔥 ';
+            if (player.shield > 0) powerupText += '🛡️ ';
+            if (player.damageBoost > 0) powerupText += '💥 ';
+            
+            if (powerupText) {
+                this.ctx.fillStyle = "#ffffff";
+                this.ctx.font = "10px Arial";
+                this.ctx.fillText(powerupText, player.x, player.y + C.PLAYER_SIZE + 35);
+            }
+        }
+    }
+
+    updateUI() {
+        const status = document.getElementById('status');
+        const queue = document.getElementById('queue');
+        
+        const isActive = this.model.players.has(this.viewId);
+        const queuePosition = this.model.queue.indexOf(this.viewId);
+        
+        if (isActive) {
+            const player = this.model.players.get(this.viewId);
+            if (player.dead) {
+                status.innerHTML = '<span class="status-dead">MARINE DOWN - RESPAWNING...</span>';
+            } else {
+                status.textContent = `HEALTH: ${player.health} | FRAGS: ${player.score}`;
+            }
+        } else if (queuePosition !== -1) {
+            status.textContent = `WAITING FOR DEPLOYMENT - POSITION: ${queuePosition + 1}`;
+        } else {
+            status.textContent = "CONNECTING TO MARS BASE...";
+        }
+        
+        const aliveMonsters = Array.from(this.model.monsters).filter(m => !m.dead);
+        const totalPlayers = this.model.players.size + this.model.queue.length;
+        queue.textContent = `MARINES: ${this.model.players.size}/${C.MAX_ACTIVE_PLAYERS} | QUEUE: ${this.model.queue.length} | TOTAL: ${totalPlayers} | DEMONS: ${aliveMonsters.length}`;
+    }
+
+    detach() {
+        super.detach();
+        // Clean up event listeners if needed
+    }
+}
+
+// Initialize the game - Remove QR code widget
+// Multisynq.App.makeWidgetDock(); // Commented out to remove QR code
+
+Multisynq.Session.join({
+    apiKey: '2zU3zTlT1sS9q0gtuny9l7uLlRi2GYsjibFLecKs40',
+    appId: 'io.multisynq.collaborative-canvas-app',
+    model: Game,
+    view: GameView,
+});
+        </script>
+    </body>
+</html> 
