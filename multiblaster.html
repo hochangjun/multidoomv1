@@ -113,6 +113,79 @@
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
+
+            #chatbox {
+                position: fixed;
+                bottom: 60px; /* Above initials and controls */
+                left: 10px;
+                width: 300px;
+                height: 150px;
+                background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(30,0,0,0.75));
+                border: 2px solid #ff3333;
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
+                display: flex;
+                flex-direction: column;
+                padding: 5px;
+                font-size: 12px;
+            }
+            #chat-messages {
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 5px;
+                color: #ffcccc;
+                scrollbar-width: thin;
+                scrollbar-color: #ff3333 #1a0000;
+            }
+            #chat-messages::-webkit-scrollbar {
+                width: 8px;
+            }
+            #chat-messages::-webkit-scrollbar-track {
+                background: #1a0000;
+            }
+            #chat-messages::-webkit-scrollbar-thumb {
+                background-color: #ff3333;
+                border-radius: 4px;
+            }
+            #chat-messages .chat-message {
+                margin-bottom: 3px;
+                word-wrap: break-word;
+            }
+            #chat-messages .chat-message .sender {
+                font-weight: bold;
+                color: #ff6666;
+            }
+            #chat-messages .chat-message .text {
+                color: #ffdddd;
+            }
+            #chat-input-container {
+                display: flex;
+                padding-top: 5px;
+                border-top: 1px solid #ff3333;
+            }
+            #chat-input {
+                flex-grow: 1;
+                background: rgba(0,0,0,0.5);
+                border: 1px solid #ff3333;
+                color: #ffcccc;
+                padding: 5px;
+                font-family: 'Orbitron', monospace;
+                font-size: 12px;
+                border-radius: 4px 0 0 4px;
+            }
+            #chat-send {
+                background: #ff3333;
+                color: #1a0000;
+                border: 1px solid #ff3333;
+                padding: 5px 10px;
+                cursor: pointer;
+                font-family: 'Orbitron', monospace;
+                font-weight: bold;
+                border-radius: 0 4px 4px 0;
+            }
+            #chat-send:hover {
+                background: #ff6666;
+            }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/@multisynq/client@1.0.1/bundled/multisynq-client.min.js"></script>
     </head>
@@ -128,6 +201,13 @@
         <div id="controls">
             WASD: Move | Mouse: Aim<br>
             CLICK/SPACE: Shoot | Mobile: Touch controls
+        </div>
+        <div id="chatbox">
+            <div id="chat-messages"></div>
+            <div id="chat-input-container">
+                <input id="chat-input" type="text" placeholder="Type message...">
+                <button id="chat-send">SEND</button>
+            </div>
         </div>
         <script>
 
@@ -256,12 +336,13 @@ C.MONSTER_DAMAGE = 75;
 C.SMALL_MONSTER_SPEED = 2;
 C.SMALL_MONSTER_SIZE = 10;
 C.SMALL_MONSTER_HEALTH = 150;
-C.SMALL_MONSTER_DAMAGE = 37; // Half damage, kills in 2 hits
+C.SMALL_MONSTER_DAMAGE = 50; // Half damage, kills in 2 hits
 C.KNOCKBACK_FORCE = 8;
 C.INVINCIBILITY_FRAMES = 90; // 1.5 seconds at 60fps
 C.POWERUP_DURATION = 600; // 10 seconds at 60fps
 C.POWERUP_SPAWN_CHANCE = 0.7; // 70% chance for imp to drop powerup
 C.POWERUP_LIFETIME = 1800; // 30 seconds before disappearing
+C.MAX_CHAT_HISTORY = 50;
 
 // Game root model
 class Game extends Multisynq.Model {
@@ -273,6 +354,7 @@ class Game extends Multisynq.Model {
         this.monsters = new Set();
         this.powerups = new Set();
         this.scores = persisted?.scores ?? {};
+        this.chatHistory = persisted?.chatHistory ?? [];
         
         this.subscribe(this.sessionId, "view-join", this.viewJoined);
         this.subscribe(this.sessionId, "view-exit", this.viewExited);
@@ -280,6 +362,9 @@ class Game extends Multisynq.Model {
         this.createWalls();
         this.spawnMonster();
         this.mainLoop();
+        
+        // Chat subscriptions
+        this.subscribe("chat", "post", this.handleNewChatMessage);
     }
 
     createWalls() {
@@ -612,6 +697,34 @@ class Game extends Multisynq.Model {
                bullet.x <= wall.x + wall.w &&
                bullet.y >= wall.y && 
                bullet.y <= wall.y + wall.h;
+    }
+
+    handleNewChatMessage({ viewId, text }) {
+        const player = this.players.get(viewId);
+        const playerName = (player && player.name) ? player.name : `Marine ${Array.from(this.players.keys()).indexOf(viewId) + 1}`;
+        
+        // Basic HTML escaping
+        const escapedText = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+        const message = {
+            viewId,
+            name: playerName,
+            text: escapedText,
+            timestamp: this.now()
+        };
+        
+        this.chatHistory.push(message);
+        if (this.chatHistory.length > C.MAX_CHAT_HISTORY) {
+            this.chatHistory.shift();
+        }
+        
+        this.publish(this.sessionId, "chat-updated", this.chatHistory);
+        this.persistSession({ scores: this.scores, chatHistory: this.chatHistory });
     }
 }
 Game.register("Game");
@@ -1011,11 +1124,18 @@ class GameView extends Multisynq.View {
         this.mouseY = 0;
         this.keys = {up: false, down: false, left: false, right: false};
         
+        this.chatMessagesEl = document.getElementById('chat-messages');
+        this.chatInputEl = document.getElementById('chat-input');
+        this.chatSendButton = document.getElementById('chat-send');
+
         this.setupControls();
         this.smoothing = new WeakMap();
+        this.lastRenderTime = this.now();
         
         // Subscribe to sound events
         this.subscribe(this.model.sessionId, "sound", this.handleSound);
+        // Subscribe to chat updates
+        this.subscribe(this.model.sessionId, "chat-updated", this.renderChatMessages);
         
         // Enable audio on first user interaction
         document.addEventListener('click', () => soundManager.enable(), {once: true});
@@ -1053,6 +1173,8 @@ class GameView extends Multisynq.View {
         const initials = document.getElementById('initials');
         initials.addEventListener('change', () => {
             this.publish(this.viewId, "set-name", initials.value);
+            // Persist name for chat
+            localStorage.setItem('doom_arena_player_name', initials.value);
         });
         
         initials.addEventListener('keydown', (e) => {
@@ -1060,6 +1182,23 @@ class GameView extends Multisynq.View {
                 initials.blur();
             }
         });
+
+        // Load persisted name for initials field
+        const persistedName = localStorage.getItem('doom_arena_player_name');
+        if (persistedName) {
+            initials.value = persistedName;
+            this.publish(this.viewId, "set-name", persistedName);
+        }
+        
+        // Chat input
+        this.chatSendButton.addEventListener('click', () => this.sendChatMessage());
+        this.chatInputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.sendChatMessage();
+            }
+        });
+        // Initial render of chat if history exists from model
+        this.renderChatMessages(this.model.chatHistory || []);
     }
 
     updateMousePosition(e) {
@@ -1197,12 +1336,49 @@ class GameView extends Multisynq.View {
         });
     }
 
+    sendChatMessage() {
+        const text = this.chatInputEl.value.trim();
+        if (text) {
+            this.publish("chat", "post", { viewId: this.viewId, text });
+            this.chatInputEl.value = '';
+        }
+    }
+
+    renderChatMessages(chatHistory) {
+        if (!this.chatMessagesEl) return;
+        this.chatMessagesEl.innerHTML = ''; // Clear existing messages
+        
+        (chatHistory || []).forEach(msg => {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-message');
+            
+            const senderSpan = document.createElement('span');
+            senderSpan.classList.add('sender');
+            senderSpan.textContent = `${msg.name}: `;
+            
+            const textSpan = document.createElement('span');
+            textSpan.classList.add('text');
+            textSpan.textContent = msg.text; // Text is already escaped by model
+            
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(textSpan);
+            
+            this.chatMessagesEl.appendChild(msgDiv);
+        });
+        
+        this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
+    }
+
     update() {
-        this.render();
+        const currentTime = this.now();
+        const deltaTime = (currentTime - this.lastRenderTime) / 16; // Assuming ~60fps, so 16ms per frame
+        this.lastRenderTime = currentTime;
+
+        this.render(deltaTime);
         this.updateUI();
     }
 
-    render() {
+    render(deltaTime) {
         this.ctx.clearRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
         
         // Draw walls with Doom-style shading
@@ -1218,31 +1394,64 @@ class GameView extends Multisynq.View {
         
         // Draw powerups
         for (const powerup of this.model.powerups) {
-            this.drawPowerup(powerup);
+            this.drawPowerup(powerup, deltaTime);
         }
         
         // Draw monsters
         for (const monster of this.model.monsters) {
             if (!monster.dead) {
-                this.drawMonster(monster);
+                this.drawMonster(monster, deltaTime);
             }
         }
         
         // Draw players
         for (const player of this.model.players.values()) {
-            this.drawPlayer(player);
+            this.drawPlayer(player, deltaTime);
         }
         
         // Draw bullets with glow effect
         for (const bullet of this.model.bullets) {
-            this.drawBullet(bullet);
+            this.drawBullet(bullet, deltaTime);
         }
     }
 
-    drawPowerup(powerup) {
+    // Helper for smoothing positions and angles
+    getSmoothedValues(obj, deltaTime, smoothFactor = 0.2) {
+        if (!this.smoothing.has(obj)) {
+            this.smoothing.set(obj, { x: obj.x, y: obj.y, angle: obj.angle });
+        }
+        const smoothed = this.smoothing.get(obj);
+
+        // Smooth position
+        const targetX = obj.x;
+        const targetY = obj.y;
+        smoothed.x += (targetX - smoothed.x) * smoothFactor * deltaTime;
+        smoothed.y += (targetY - smoothed.y) * smoothFactor * deltaTime;
+
+        // Snap if too far (e.g., teleport or respawn)
+        if (Math.abs(targetX - smoothed.x) > 100) smoothed.x = targetX;
+        if (Math.abs(targetY - smoothed.y) > 100) smoothed.y = targetY;
+
+        // Smooth angle (if object has an angle)
+        if (obj.angle !== undefined) {
+            let targetAngle = obj.angle;
+            let currentAngle = smoothed.angle;
+
+            // Normalize angles to be close for smoother interpolation
+            while (targetAngle - currentAngle > Math.PI) targetAngle -= 2 * Math.PI;
+            while (targetAngle - currentAngle < -Math.PI) targetAngle += 2 * Math.PI;
+            
+            smoothed.angle += (targetAngle - currentAngle) * smoothFactor * deltaTime;
+        }
+        return smoothed;
+    }
+
+    drawPowerup(powerup, deltaTime) {
         const time = this.now() / 100; // For animation
         const bobY = Math.sin(time + powerup.bobOffset) * 3; // Floating animation
         
+        const smoothed = this.getSmoothedValues(powerup, deltaTime);
+
         const colors = {
             speed: '#00ffff',    // Cyan
             shield: '#00ff00',   // Green
@@ -1269,13 +1478,13 @@ class GameView extends Multisynq.View {
             // Powerup circle
             this.ctx.fillStyle = color;
             this.ctx.beginPath();
-            this.ctx.arc(powerup.x, powerup.y + bobY, 12, 0, Math.PI * 2);
+            this.ctx.arc(smoothed.x, smoothed.y + bobY, 12, 0, Math.PI * 2);
             this.ctx.fill();
             
             // Inner circle
             this.ctx.fillStyle = '#ffffff';
             this.ctx.beginPath();
-            this.ctx.arc(powerup.x, powerup.y + bobY, 8, 0, Math.PI * 2);
+            this.ctx.arc(smoothed.x, smoothed.y + bobY, 8, 0, Math.PI * 2);
             this.ctx.fill();
             
             this.ctx.shadowBlur = 0;
@@ -1284,29 +1493,31 @@ class GameView extends Multisynq.View {
             this.ctx.fillStyle = color;
             this.ctx.font = 'bold 16px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(symbols[powerup.type] || '?', powerup.x, powerup.y + bobY + 6);
+            this.ctx.fillText(symbols[powerup.type] || '?', smoothed.x, smoothed.y + bobY + 6);
         }
     }
 
-    drawMonster(monster) {
+    drawMonster(monster, deltaTime) {
         const glowColor = monster.isLarge ? "#ff0066" : "#ff6600";
         const bodyColor = monster.isLarge ? "#cc0044" : "#cc4400";
         const coreColor = monster.isLarge ? "#ff0066" : "#ff6600";
         const label = monster.isLarge ? "DEMON" : "IMP";
+        
+        const smoothed = this.getSmoothedValues(monster, deltaTime);
         
         // Monster body with menacing glow
         this.ctx.shadowColor = glowColor;
         this.ctx.shadowBlur = monster.isLarge ? 20 : 15;
         this.ctx.fillStyle = bodyColor;
         this.ctx.beginPath();
-        this.ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+        this.ctx.arc(smoothed.x, smoothed.y, monster.size, 0, Math.PI * 2);
         this.ctx.fill();
         
         // Inner core
         this.ctx.shadowBlur = monster.isLarge ? 10 : 8;
         this.ctx.fillStyle = coreColor;
         this.ctx.beginPath();
-        this.ctx.arc(monster.x, monster.y, monster.size * 0.7, 0, Math.PI * 2);
+        this.ctx.arc(smoothed.x, smoothed.y, monster.size * 0.7, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.shadowBlur = 0;
@@ -1314,8 +1525,8 @@ class GameView extends Multisynq.View {
         // Health bar
         const barWidth = monster.isLarge ? 40 : 30;
         const barHeight = monster.isLarge ? 8 : 6;
-        const barX = monster.x - barWidth / 2;
-        const barY = monster.y - monster.size - 15;
+        const barX = smoothed.x - barWidth / 2;
+        const barY = smoothed.y - monster.size - 15;
         
         // Background
         this.ctx.fillStyle = "#330000";
@@ -1332,35 +1543,39 @@ class GameView extends Multisynq.View {
         this.ctx.fillStyle = "#ffffff";
         this.ctx.font = `bold ${monster.isLarge ? 10 : 8}px Orbitron, monospace`;
         this.ctx.textAlign = "center";
-        this.ctx.fillText(label, monster.x, monster.y + monster.size + 25);
+        this.ctx.fillText(label, smoothed.x, smoothed.y + monster.size + 25);
         this.ctx.shadowBlur = 0;
     }
 
-    drawBullet(bullet) {
+    drawBullet(bullet, deltaTime) {
         // Enhanced bullets for damage boost
         const isDamageBoost = bullet.damage > 50;
         const glowColor = isDamageBoost ? "#ff6600" : "#ffff00";
         const coreColor = isDamageBoost ? "#ff3300" : "#ffffff";
+        
+        const smoothed = this.getSmoothedValues(bullet, deltaTime, 0.5); // Bullets might need faster smoothing
         
         // Glow effect
         this.ctx.shadowColor = glowColor;
         this.ctx.shadowBlur = isDamageBoost ? 20 : 10;
         this.ctx.fillStyle = glowColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, bullet.size + (isDamageBoost ? 3 : 1), 0, Math.PI * 2);
+        this.ctx.arc(smoothed.x, smoothed.y, bullet.size + (isDamageBoost ? 3 : 1), 0, Math.PI * 2);
         this.ctx.fill();
         
         // Core bullet
         this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = coreColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+        this.ctx.arc(smoothed.x, smoothed.y, bullet.size, 0, Math.PI * 2);
         this.ctx.fill();
     }
 
-    drawPlayer(player) {
+    drawPlayer(player, deltaTime) {
         const isMe = player.viewId === this.viewId;
         
+        const smoothed = this.getSmoothedValues(player, deltaTime);
+
         // Invincibility flashing effect
         if (player.invincible > 0 && Math.floor(player.invincible / 5) % 2 === 0) {
             return; // Skip drawing every 5 frames for flashing effect
@@ -1376,13 +1591,13 @@ class GameView extends Multisynq.View {
             this.ctx.strokeStyle = `rgba(0, 255, 0, ${shieldAlpha})`;
             this.ctx.lineWidth = 4;
             this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.arc(smoothed.x, smoothed.y, shieldRadius, 0, Math.PI * 2);
             this.ctx.stroke();
             
             // Inner shield glow
             this.ctx.fillStyle = `rgba(0, 255, 0, ${shieldAlpha * 0.3})`;
             this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.arc(smoothed.x, smoothed.y, shieldRadius, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.shadowBlur = 0;
         }
@@ -1405,7 +1620,7 @@ class GameView extends Multisynq.View {
         
         this.ctx.fillStyle = player.dead ? "#666" : (isMe ? "#00ff00" : "#ff3333");
         this.ctx.beginPath();
-        this.ctx.arc(player.x, player.y, C.PLAYER_SIZE, 0, Math.PI * 2);
+        this.ctx.arc(smoothed.x, smoothed.y, C.PLAYER_SIZE, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.shadowBlur = 0;
@@ -1417,10 +1632,10 @@ class GameView extends Multisynq.View {
             this.ctx.strokeStyle = "#ffffff";
             this.ctx.lineWidth = 3;
             this.ctx.beginPath();
-            this.ctx.moveTo(player.x, player.y);
+            this.ctx.moveTo(smoothed.x, smoothed.y);
             this.ctx.lineTo(
-                player.x + Math.cos(player.angle) * C.PLAYER_SIZE * 1.5,
-                player.y + Math.sin(player.angle) * C.PLAYER_SIZE * 1.5
+                smoothed.x + Math.cos(smoothed.angle) * C.PLAYER_SIZE * 1.5,
+                smoothed.y + Math.sin(smoothed.angle) * C.PLAYER_SIZE * 1.5
             );
             this.ctx.stroke();
             this.ctx.shadowBlur = 0;
@@ -1430,8 +1645,8 @@ class GameView extends Multisynq.View {
         if (!player.dead) {
             const barWidth = 24;
             const barHeight = 6;
-            const barX = player.x - barWidth / 2;
-            const barY = player.y - C.PLAYER_SIZE - 12;
+            const barX = smoothed.x - barWidth / 2;
+            const barY = smoothed.y - C.PLAYER_SIZE - 12;
             
             // Background
             this.ctx.fillStyle = "#330000";
@@ -1453,7 +1668,7 @@ class GameView extends Multisynq.View {
         this.ctx.font = "bold 12px Orbitron, monospace";
         this.ctx.textAlign = "center";
         const name = player.name || `Marine ${Array.from(this.model.players.keys()).indexOf(player.viewId) + 1}`;
-        this.ctx.fillText(`${name} [${player.score}]`, player.x, player.y + C.PLAYER_SIZE + 20);
+        this.ctx.fillText(`${name} [${player.score}]`, smoothed.x, smoothed.y + C.PLAYER_SIZE + 20);
         this.ctx.shadowBlur = 0;
         
         // Powerup indicators with flashing when about to expire
@@ -1479,7 +1694,7 @@ class GameView extends Multisynq.View {
                 this.ctx.shadowBlur = 3;
                 this.ctx.fillStyle = "#ffffff";
                 this.ctx.font = "bold 14px Arial";
-                this.ctx.fillText(powerupText, player.x, player.y + C.PLAYER_SIZE + 35);
+                this.ctx.fillText(powerupText, smoothed.x, smoothed.y + C.PLAYER_SIZE + 35);
                 this.ctx.shadowBlur = 0;
             }
         }
@@ -1524,6 +1739,7 @@ Multisynq.Session.join({
     appId: 'io.multisynq.collaborative-canvas-app',
     model: Game,
     view: GameView,
+    tps: 60 // Set reflector ticks per second for smoother updates
 });
         </script>
     </body>

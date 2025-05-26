@@ -30,7 +30,7 @@
                 cursor: crosshair;
                 display: block;
                 margin: 0 auto;
-                margin-top: 60px; /* Space for top UI elements */
+                margin-top: 80px; /* Space for top UI elements */
             }
             /* Mobile Controls Container */
             #mobile-controls {
@@ -99,7 +99,7 @@
             /* Mobile Labels */
             .joystick-label {
                 position: absolute;
-                top: -25px;
+                top: -25px; /* Default for desktop, overridden in mobile */
                 left: 50%;
                 transform: translateX(-50%);
                 color: #ffffff;
@@ -109,77 +109,137 @@
                 pointer-events: none;
             }
             
-            /* Show mobile controls on touch devices */
-            @media (hover: none) and (pointer: coarse) {
-                #mobile-controls {
-                    display: block;
-                }
-                #canvas {
-                    margin-bottom: 200px;
-                    margin-top: 80px; /* More space for mobile UI */
-                    max-height: calc(100vh - 280px); /* Account for top and bottom space */
-                }
-                
-                /* Adjust joystick positions for better spacing */
-                #move-joystick {
-                    left: 20px;
-                    bottom: 20px;
-                }
-                #aim-joystick {
-                    right: 20px;
-                    bottom: 20px;
-                }
-                
-                /* Move name input higher on mobile to avoid joysticks */
-                #initials {
-                    bottom: 180px; /* Higher on mobile */
-                }
-            }
-            #ui {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                color: #ff6666;
-                background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
-                padding: 15px;
-                border-radius: 8px;
-                font-size: 14px;
-                min-width: 220px;
-                border: 2px solid #ff3333;
-                box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
-                font-weight: 700;
-                z-index: 100;
-            }
-            
-            /* Mobile UI adjustments */
-            @media (hover: none) and (pointer: coarse) {
-                #ui {
-                    top: 5px;
-                    right: 5px;
-                    padding: 8px;
-                    font-size: 12px;
-                    min-width: 180px;
-                }
-                #initials {
-                    bottom: 220px !important; /* Move above mobile controls */
-                    left: 5px;
-                    padding: 8px;
-                    font-size: 12px;
-                }
-                #controls {
-                    display: none; /* Hide desktop controls text on mobile */
-                }
+            /* Mobile devices - simplified approach */
+            @media (max-width: 768px) {
                 #title {
                     font-size: 18px;
                     top: 5px;
                     left: 5px;
+                    z-index: 102;
+                }
+
+                #ui {
+                    top: 50px;
+                    left: 5px;
+                    right: 5px;
+                    padding: 8px;
+                    font-size: 11px;
+                    min-width: auto;
+                }
+
+                #canvas {
+                    margin-top: 110px;
+                    margin-bottom: 20px;
+                    max-height: calc(100vh - 130px);
+                }
+
+                #chatbox {
+                    bottom: 140px;
+                    left: 5px;
+                    right: 5px;
+                    width: auto;
+                    height: 25s0px;
+                    transform: none;
+                    font-size: 11px;
+                    z-index: 50;
+                }
+
+                #initials {
+                    bottom: 80px;
+                    left: 5px;
+                    right: 5px;
+                    width: auto;
+                    transform: none;
+                    padding: 10px;
+                    font-size: 14px;
+                    z-index: 51;
+                    box-sizing: border-box;
+                }
+
+                #controls {
+                    bottom: 5px;
+                    right: 5px;
+                    font-size: 10px;
+                }
+
+                #chat-input {
+                    font-size: 10px;
+                    padding: 4px;
+                }
+
+                #chat-send {
+                    padding: 4px 8px;
+                    font-size: 10px;
+                }
+
+                /* Mobile controls - only show on actual touch devices */
+                #mobile-controls {
+                    display: none;
+                }
+            }
+
+            /* Touch devices specifically */
+            @media (hover: none) and (pointer: coarse) {
+                #mobile-controls {
+                    display: block !important;
+                    height: 160px;
+                    z-index: 1000;
+                }
+                
+                #canvas {
+                    margin-bottom: 160px !important;
+                    max-height: calc(100vh - 240px) !important;
+                }
+                
+                #chatbox {
+                    bottom: 260px !important;
+                    height: 140px !important;
+                    font-size: 10px !important;
+                }
+
+                #initials {
+                    bottom: 200px !important;
+                    padding: 8px !important;
+                    font-size: 12px !important;
+                }
+
+                #controls {
+                    display: none !important;
+                }
+                
+                /* Bigger Joysticks */
+                #move-joystick,
+                #aim-joystick {
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50px;
+                }
+                #move-joystick {
+                    left: 15px;
+                    bottom: 15px;
+                }
+                #aim-joystick {
+                    right: 15px;
+                    bottom: 15px;
+                }
+                #move-knob,
+                #aim-knob {
+                    width: 60px;
+                    height: 60px;
+                    left: 17px;
+                    top: 17px;
+                    border-radius: 30px;
+                }
+                .joystick-label {
+                    top: -18px;
+                    font-size: 10px;
+                    white-space: nowrap;
                 }
             }
             #initials {
                 position: fixed;
-                bottom: 120px; /* Move above mobile controls */
-                left: 50%;
-                transform: translateX(-50%); /* Center horizontally */
+                bottom: 10px; /* Below chatbox on desktop */
+                left: 10px; /* Same side as chatbox */
                 padding: 12px 20px;
                 border-radius: 8px;
                 background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
@@ -190,7 +250,22 @@
                 font-weight: 700;
                 box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
                 text-align: center;
-                min-width: 200px;
+                width: 280px; /* Match chatbox width */
+                pointer-events: auto;
+                touch-action: manipulation;
+            }
+
+            #chat-input {
+                flex-grow: 1;
+                background: rgba(0,0,0,0.5);
+                border: 1px solid #ff3333;
+                color: #ffcccc;
+                padding: 5px;
+                font-family: 'Orbitron', monospace;
+                font-size: 12px;
+                border-radius: 4px 0 0 4px;
+                pointer-events: auto;
+                touch-action: manipulation;
             }
             #initials::placeholder {
                 color: #ff9999;
@@ -225,6 +300,89 @@
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
+
+            #chatbox {
+                position: fixed;
+                bottom: 80px; /* Above initials input */
+                left: 10px;
+                width: 300px;
+                height: 150px;
+                background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(30,0,0,0.75));
+                border: 2px solid #ff3333;
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
+                display: flex;
+                flex-direction: column;
+                padding: 5px;
+                font-size: 12px;
+            }
+            #chat-messages {
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 5px;
+                color: #ffcccc;
+                scrollbar-width: thin;
+                scrollbar-color: #ff3333 #1a0000;
+            }
+            #chat-messages::-webkit-scrollbar {
+                width: 8px;
+            }
+            #chat-messages::-webkit-scrollbar-track {
+                background: #1a0000;
+            }
+            #chat-messages::-webkit-scrollbar-thumb {
+                background-color: #ff3333;
+                border-radius: 4px;
+            }
+            #chat-messages .chat-message {
+                margin-bottom: 3px;
+                word-wrap: break-word;
+            }
+            #chat-messages .chat-message .sender {
+                font-weight: bold;
+                color: #ff6666;
+            }
+            #chat-messages .chat-message .text {
+                color: #ffdddd;
+            }
+            #chat-input-container {
+                display: flex;
+                padding-top: 5px;
+                border-top: 1px solid #ff3333;
+            }
+
+            #chat-send {
+                background: #ff3333;
+                color: #1a0000;
+                border: 1px solid #ff3333;
+                padding: 5px 10px;
+                cursor: pointer;
+                font-family: 'Orbitron', monospace;
+                font-weight: bold;
+                border-radius: 0 4px 4px 0;
+            }
+            #chat-send:hover {
+                background: #ff6666;
+            }
+            
+
+
+            /* UI Elements - Desktop defaults */
+            #ui {
+                position: fixed;
+                top: 40px;
+                right: 10px;
+                color: #ff6666;
+                background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(51,0,0,0.8));
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 14px;
+                min-width: 220px;
+                border: 2px solid #ff3333;
+                box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
+                font-weight: 700;
+                z-index: 100;
+            }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/@multisynq/client@1.0.1/bundled/multisynq-client.min.js"></script>
     </head>
@@ -252,6 +410,13 @@
         <div id="controls">
             WASD: Move | Mouse: Aim<br>
             CLICK/SPACE: Shoot | Mobile: Touch controls
+        </div>
+        <div id="chatbox">
+            <div id="chat-messages"></div>
+            <div id="chat-input-container">
+                <input id="chat-input" type="text" placeholder="Type message...">
+                <button id="chat-send">SEND</button>
+            </div>
         </div>
         <script>
 
@@ -380,12 +545,13 @@ C.MONSTER_DAMAGE = 75;
 C.SMALL_MONSTER_SPEED = 2;
 C.SMALL_MONSTER_SIZE = 10;
 C.SMALL_MONSTER_HEALTH = 150;
-C.SMALL_MONSTER_DAMAGE = 37; // Half damage, kills in 2 hits
+C.SMALL_MONSTER_DAMAGE = 35; // Adjusted damage
 C.KNOCKBACK_FORCE = 8;
 C.INVINCIBILITY_FRAMES = 90; // 1.5 seconds at 60fps
 C.POWERUP_DURATION = 600; // 10 seconds at 60fps
 C.POWERUP_SPAWN_CHANCE = 0.7; // 70% chance for imp to drop powerup
 C.POWERUP_LIFETIME = 1800; // 30 seconds before disappearing
+C.MAX_CHAT_HISTORY = 50;
 
 // Separate model chunks to avoid 10k message limit
 class GameEntities extends Multisynq.Model {
@@ -454,6 +620,9 @@ class Game extends Multisynq.Model {
         this.players = new Map(); // active players
         this.queue = []; // waiting players
         this.scores = persisted?.scores ?? {};
+        // Ensure playerNames is a Map, even if loaded from persisted data
+        this.playerNames = persisted?.playerNames ? new Map(Object.entries(persisted.playerNames)) : new Map();
+        this.chatHistory = persisted?.chatHistory ?? [];
         
         // Create separate model chunks to avoid 10k limit
         this.gameEntities = GameEntities.create({}); // bullets, monsters, powerups
@@ -461,6 +630,9 @@ class Game extends Multisynq.Model {
         
         this.subscribe(this.sessionId, "view-join", this.viewJoined);
         this.subscribe(this.sessionId, "view-exit", this.viewExited);
+        
+        // Chat subscriptions
+        this.subscribe("chat", "post", this.handleNewChatMessage);
         
         this.gameStatic.createWalls();
         this.gameEntities.spawnMonster();
@@ -513,6 +685,11 @@ class Game extends Multisynq.Model {
         } else {
             this.queue.push(viewId);
         }
+        // Ensure player name is applied or set if joining for the first time
+        const player = this.players.get(viewId);
+        if (player && this.playerNames.has(viewId)) {
+            player.setName(this.playerNames.get(viewId));
+        }
     }
 
     viewExited(viewId) {
@@ -533,7 +710,8 @@ class Game extends Multisynq.Model {
         const player = Player.create({ 
             viewId, 
             x: spawnPoint.x, 
-            y: spawnPoint.y 
+            y: spawnPoint.y,
+            name: this.playerNames.get(viewId) || '' // Pass stored name or empty
         });
         this.players.set(viewId, player);
     }
@@ -607,12 +785,14 @@ class Game extends Multisynq.Model {
     playerKilled(killedPlayer, killerPlayer) {
         if (killerPlayer) {
             killerPlayer.score++;
-            if (killerPlayer.name) {
-                this.scores[killerPlayer.name] = Math.max(
-                    this.scores[killerPlayer.name] || 0, 
+            // Use stored name for high scores if available
+            const killerName = this.playerNames.get(killerPlayer.viewId) || killerPlayer.name;
+            if (killerName) {
+                this.scores[killerName] = Math.max(
+                    this.scores[killerName] || 0, 
                     killerPlayer.score
                 );
-                this.persistSession({ scores: this.scores });
+                this.persistSession({ scores: this.scores, playerNames: this.playerNames });
             }
         }
         
@@ -838,6 +1018,34 @@ class Game extends Multisynq.Model {
                bullet.y >= wall.y && 
                bullet.y <= wall.y + wall.h;
     }
+
+    handleNewChatMessage({ viewId, text }) {
+        const player = this.players.get(viewId);
+        const playerName = (player && player.name) ? player.name : `Marine ${Array.from(this.players.keys()).indexOf(viewId) + 1}`;
+        
+        // Basic HTML escaping
+        const escapedText = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+        const message = {
+            viewId,
+            name: playerName,
+            text: escapedText,
+            timestamp: this.now()
+        };
+        
+        this.chatHistory.push(message);
+        if (this.chatHistory.length > C.MAX_CHAT_HISTORY) {
+            this.chatHistory.shift();
+        }
+        
+        this.publish(this.sessionId, "chat-updated", this.chatHistory);
+        this.persistSession({ scores: this.scores, playerNames: this.playerNames, chatHistory: this.chatHistory });
+    }
 }
 Game.register("Game");
 
@@ -1021,9 +1229,9 @@ class Powerup extends GameObject {
 Powerup.register("Powerup");
 
 class Player extends GameObject {
-    init(options) {
-        super.init(options);
-        const {viewId, x, y} = options;
+    init(options) { // Accept full options object
+        super.init(options); // Pass full options object to GameObject.init
+        const {viewId, x, y, name} = options; // Destructure after super call
         this.viewId = viewId;
         this.x = x;
         this.y = y;
@@ -1032,7 +1240,7 @@ class Player extends GameObject {
         this.vy = 0;
         this.health = 100;
         this.score = 0;
-        this.name = '';
+        this.name = name || ''; // Initialize name from options or default
         this.dead = false;
         this.lastShot = 0;
         this.invincible = 0; // Invincibility frames
@@ -1091,8 +1299,10 @@ class Player extends GameObject {
     }
 
     setName(name) {
-        if (!name || name.length === 0) return;
+        if (!name || name.length === 0 || name === this.name) return;
         this.name = name;
+        this.game.playerNames.set(this.viewId, name); // Update centralized name store
+        this.game.persistSession({ scores: this.game.scores, playerNames: this.game.playerNames }); // Persist changes
     }
 
     applyPowerup(type) {
@@ -1269,11 +1479,17 @@ class GameView extends Multisynq.View {
         // Mobile detection for performance optimizations
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
+        this.chatMessagesEl = document.getElementById('chat-messages');
+        this.chatInputEl = document.getElementById('chat-input');
+        this.chatSendButton = document.getElementById('chat-send');
+
         this.setupControls();
         this.smoothing = new WeakMap();
         
         // Subscribe to sound events
         this.subscribe(this.model.sessionId, "sound", this.handleSound);
+        // Subscribe to chat updates
+        this.subscribe(this.model.sessionId, "chat-updated", this.renderChatMessages);
         
         // Enable audio on first user interaction
         document.addEventListener('click', () => soundManager.enable(), {once: true});
@@ -1311,6 +1527,8 @@ class GameView extends Multisynq.View {
         const initials = document.getElementById('initials');
         initials.addEventListener('change', () => {
             this.publish(this.viewId, "set-name", initials.value);
+            // Persist name for chat
+            localStorage.setItem('doom_arena_player_name', initials.value);
         });
         
         initials.addEventListener('keydown', (e) => {
@@ -1318,6 +1536,23 @@ class GameView extends Multisynq.View {
                 initials.blur();
             }
         });
+
+        // Load persisted name for initials field
+        const persistedName = localStorage.getItem('doom_arena_player_name');
+        if (persistedName) {
+            initials.value = persistedName;
+            this.publish(this.viewId, "set-name", persistedName);
+        }
+        
+        // Chat input
+        this.chatSendButton.addEventListener('click', () => this.sendChatMessage());
+        this.chatInputEl.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.sendChatMessage();
+            }
+        });
+        // Initial render of chat if history exists from model
+        this.renderChatMessages(this.model.chatHistory || []);
     }
 
     updateMousePosition(e) {
@@ -1911,6 +2146,39 @@ class GameView extends Multisynq.View {
         const aliveMonsters = Array.from(this.model.gameEntities.monsters).filter(m => !m.dead);
         const totalPlayers = this.model.players.size + this.model.queue.length;
         queue.textContent = `MARINES: ${this.model.players.size}/${C.MAX_ACTIVE_PLAYERS} | QUEUE: ${this.model.queue.length} | TOTAL: ${totalPlayers} | DEMONS: ${aliveMonsters.length}`;
+    }
+
+    sendChatMessage() {
+        const text = this.chatInputEl.value.trim();
+        if (text) {
+            this.publish("chat", "post", { viewId: this.viewId, text });
+            this.chatInputEl.value = '';
+        }
+    }
+
+    renderChatMessages(chatHistory) {
+        if (!this.chatMessagesEl) return;
+        this.chatMessagesEl.innerHTML = ''; // Clear existing messages
+        
+        (chatHistory || []).forEach(msg => {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-message');
+            
+            const senderSpan = document.createElement('span');
+            senderSpan.classList.add('sender');
+            senderSpan.textContent = `${msg.name}: `;
+            
+            const textSpan = document.createElement('span');
+            textSpan.classList.add('text');
+            textSpan.innerHTML = msg.text; // Text is already escaped by model
+            
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(textSpan);
+            
+            this.chatMessagesEl.appendChild(msgDiv);
+        });
+        
+        this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
     }
 
     detach() {
