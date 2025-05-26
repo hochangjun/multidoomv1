@@ -1495,7 +1495,7 @@ class GameView extends Multisynq.View {
         // Draw the @johnwrichkid.jpg image if loaded, otherwise fallback to circles
         if (this.monsterImageLoaded) {
             // Calculate image size based on monster size
-            const imageSize = monster.size * 2; // Make image diameter = monster size * 2
+            const imageSize = monster.size * 4; // Make image diameter = monster size * 2
             const imageX = x - imageSize / 2;
             const imageY = y - imageSize / 2;
             
