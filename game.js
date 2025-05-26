@@ -1079,6 +1079,10 @@ class GameView extends Multisynq.View {
     }
 
     setupControls() {
+        // Event throttling for 60fps max
+        this.lastMouseUpdate = 0;
+        this.lastTouchUpdate = 0;
+        
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
             this.handleKeyChange(e.code, true);
@@ -1088,8 +1092,12 @@ class GameView extends Multisynq.View {
             this.handleKeyChange(e.code, false);
         });
         
-        // Mouse controls with proper offset calculation
+        // Mouse controls with proper offset calculation - throttled to 60fps
         this.canvas.addEventListener('mousemove', (e) => {
+            const now = performance.now();
+            if (now - this.lastMouseUpdate < 16.67) return; // 60fps = 16.67ms
+            this.lastMouseUpdate = now;
+            
             this.updateMousePosition(e);
             this.updateAim();
         });
@@ -1245,9 +1253,13 @@ class GameView extends Multisynq.View {
             }
         }, { passive: false });
         
-        // Global touch move handler
+        // Global touch move handler - throttled to 60fps
         document.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            
+            const now = performance.now();
+            if (now - this.lastTouchUpdate < 16.67) return; // 60fps = 16.67ms
+            this.lastTouchUpdate = now;
             
             for (let touch of e.touches) {
                 // Handle movement joystick
