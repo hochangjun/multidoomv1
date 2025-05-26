@@ -844,7 +844,8 @@ Game.register("Game");
 class GameObject extends Multisynq.Model {
     get game() { return this.wellKnownModel("modelRoot"); }
     
-    init(_options) {
+    init(options) {
+        super.init(options);
         this.x = 0;
         this.y = 0;
         this.destroyed = false;
@@ -852,8 +853,9 @@ class GameObject extends Multisynq.Model {
 }
 
 class Wall extends GameObject {
-    init({x, y, w, h}) {
-        super.init();
+    init(options) {
+        super.init(options);
+        const {x, y, w, h} = options;
         this.x = x;
         this.y = y;
         this.w = w;
@@ -869,8 +871,9 @@ class Wall extends GameObject {
 Wall.register("Wall");
 
 class Monster extends GameObject {
-    init({x, y, isLarge}) {
-        super.init();
+    init(options) {
+        super.init(options);
+        const {x, y, isLarge} = options;
         this.x = x;
         this.y = y;
         this.isLarge = isLarge;
@@ -991,8 +994,9 @@ class Monster extends GameObject {
 Monster.register("Monster");
 
 class Powerup extends GameObject {
-    init({x, y, type}) {
-        super.init();
+    init(options) {
+        super.init(options);
+        const {x, y, type} = options;
         this.x = x;
         this.y = y;
         this.type = type; // 'speed', 'rapidfire', 'shield', 'damage'
@@ -1017,8 +1021,9 @@ class Powerup extends GameObject {
 Powerup.register("Powerup");
 
 class Player extends GameObject {
-    init({viewId, x, y}) {
-        super.init();
+    init(options) {
+        super.init(options);
+        const {viewId, x, y} = options;
         this.viewId = viewId;
         this.x = x;
         this.y = y;
@@ -1214,8 +1219,9 @@ class Player extends GameObject {
 Player.register("Player");
 
 class Bullet extends GameObject {
-    init({x, y, vx, vy, shooterId, damage, size}) {
-        super.init();
+    init(options) {
+        super.init(options);
+        const {x, y, vx, vy, shooterId, damage, size} = options;
         this.x = x;
         this.y = y;
         this.vx = vx;
@@ -1547,7 +1553,7 @@ class GameView extends Multisynq.View {
     // Original multiblaster smoothing approach for smooth rendering
     smoothPos(obj) {
         if (!this.smoothing.has(obj)) {
-            this.smoothing.set(obj, { x: obj.x, y: obj.y, a: obj.a });
+            this.smoothing.set(obj, { x: obj.x, y: obj.y, a: obj.a, lastLogTime: 0, frameCount: 0, lastFrameTime: 0 });
         }
         const smoothed = this.smoothing.get(obj);
         const dx = obj.x - smoothed.x;
@@ -1566,6 +1572,20 @@ class GameView extends Multisynq.View {
     }
 
     update() {
+        const now = performance.now();
+        if (!this.lastFrameTime) this.lastFrameTime = now;
+        const deltaTime = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+        
+        if (!this.logThrottle) this.logThrottle = 0;
+        this.logThrottle++;
+
+        if (this.logThrottle % 120 === 0) { // Log every ~2 seconds (120 frames at 60fps)
+            const fps = deltaTime > 0 ? (1000 / deltaTime).toFixed(1) : "inf";
+            console.log(`FPS: ${fps}`);
+            console.log(`Players: ${this.model.players.size}, Monsters: ${this.model.gameEntities.monsters.size}, Bullets: ${this.model.gameEntities.bullets.size}, Powerups: ${this.model.gameEntities.powerups.size}`);
+        }
+
         this.render();
         this.updateUI();
     }
