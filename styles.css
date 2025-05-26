@@ -133,7 +133,7 @@ html, body {
         height: 25s0px;
         transform: none;
         font-size: 11px;
-        z-index: 50;
+        z-index: 1001;
     }
 
     #initials {
@@ -144,7 +144,7 @@ html, body {
         transform: none;
         padding: 10px;
         font-size: 14px;
-        z-index: 51;
+        z-index: 1001;
         box-sizing: border-box;
     }
 
@@ -175,7 +175,7 @@ html, body {
     #mobile-controls {
         display: block !important;
         height: 160px;
-        z-index: 1000;
+        z-index: 1;
     }
     
     #canvas {
