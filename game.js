@@ -1253,12 +1253,12 @@ class GameView extends Multisynq.View {
             }
         }, { passive: false });
         
-        // Global touch move handler - throttled to 60fps
+        // Global touch move handler - throttled to 10fps for better mobile performance
         document.addEventListener('touchmove', (e) => {
             e.preventDefault();
             
             const now = performance.now();
-            if (now - this.lastTouchUpdate < 50) return; // 20fps = 50ms
+            if (now - this.lastTouchUpdate < 100) return; // 10fps = 100ms
             this.lastTouchUpdate = now;
             
             for (let touch of e.touches) {

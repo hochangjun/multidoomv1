@@ -126,7 +126,7 @@ html, body {
     }
 
     #chatbox {
-        bottom: 140px;
+        bottom: 120px;
         left: 5px;
         right: 5px;
         width: auto;
@@ -137,7 +137,7 @@ html, body {
     }
 
     #initials {
-        bottom: 80px;
+        bottom: 65px;
         left: 5px;
         right: 5px;
         width: auto;
@@ -187,16 +187,26 @@ html, body {
         bottom: 260px !important;
         height: 140px !important;
         font-size: 10px !important;
+        pointer-events: none !important;
     }
 
     #initials {
         bottom: 200px !important;
         padding: 8px !important;
         font-size: 12px !important;
+        pointer-events: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
     }
 
     #controls {
         display: none !important;
+    }
+    
+    /* Disable chat input on mobile touch devices */
+    #chat-input, #chat-send {
+        pointer-events: none !important;
+        opacity: 0.5 !important;
     }
     
     /* Bigger Joysticks */
