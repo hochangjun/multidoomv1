@@ -729,12 +729,7 @@ class Game extends Multisynq.Model {
                     const knockbackAngle = Math.atan2(player.y - monster.y, player.x - monster.x);
                     player.knockback(knockbackAngle, C.KNOCKBACK_FORCE);
                     
-                    // Monster damage should be much higher than bullet damage
-                    if (monster.isLarge) {
-                        player.takeDamage(75); // Large demons kill in 1-2 hits
-                    } else {
-                        player.takeDamage(37); // Small imps kill in 3 hits
-                    }
+                    player.takeDamage(monster.damage);
                     
                     if (player.dead) {
                         this.playerKilled(player, null); // No killer for monster kills
