@@ -1780,11 +1780,18 @@ class GameView extends Multisynq.View {
 // Initialize the game - Remove QR code widget
 // Multisynq.App.makeWidgetDock(); // Commented out to remove QR code
 
+// Configuration - these should be set via build-time environment variables
+const CONFIG = {
+    apiKey: 'REPLACE_WITH_API_KEY',
+    sessionName: 'REPLACE_WITH_SESSION_NAME', 
+    sessionPassword: 'REPLACE_WITH_SESSION_PASSWORD'
+};
+
 Multisynq.Session.join({
-    apiKey: '2zU3zTlT1sS9q0gtuny9l7uLlRi2GYsjibFLecKs40',
-    appId: 'io.multisynq.collaborative-canvas-app',
-    name: 'global-arena',
-    password: 'doom2024',
+    apiKey: CONFIG.apiKey,
+    appId: 'io.multisynq.multidoomv1-app',
+    name: CONFIG.sessionName,
+    password: CONFIG.sessionPassword,
     model: Game,
     view: GameView,
 }); 

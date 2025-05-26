@@ -1,26 +1,24 @@
 const fs = require('fs');
+const path = require('path');
 
-// Read the template HTML file
-let html = fs.readFileSync('index.html', 'utf8');
+// Read the game.js file
+const gameJsPath = path.join(__dirname, 'game.js');
+let gameJsContent = fs.readFileSync(gameJsPath, 'utf8');
 
-// Get environment variables from Vercel
-const apiKey = process.env.MULTISYNQ_API_KEY || '2zU3zTlT1sS9q0gtuny9l7uLlRi2GYsjibFLecKs40';
-const appId = process.env.MULTISYNQ_APP_ID || 'io.multisynq.collaborative-canvas-app';
+// Replace placeholders with environment variables
+gameJsContent = gameJsContent.replace('REPLACE_WITH_API_KEY', process.env.MULTISYNQ_API_KEY || 'your-api-key-here');
+gameJsContent = gameJsContent.replace('REPLACE_WITH_SESSION_NAME', process.env.MULTISYNQ_SESSION_NAME || 'default-session');
+gameJsContent = gameJsContent.replace('REPLACE_WITH_SESSION_PASSWORD', process.env.MULTISYNQ_SESSION_PASSWORD || 'default-password');
 
-// Replace the hardcoded values with environment variables
-html = html.replace(
-    /apiKey: '[^']*'/,
-    `apiKey: '${apiKey}'`
-);
+// Write the updated content to a build directory or overwrite the original
+const buildDir = path.join(__dirname, 'dist');
+if (!fs.existsSync(buildDir)) {
+    fs.mkdirSync(buildDir);
+}
 
-html = html.replace(
-    /appId: '[^']*'/,
-    `appId: '${appId}'`
-);
+// Copy all files to dist and replace game.js with the processed version
+fs.copyFileSync(path.join(__dirname, 'index.html'), path.join(buildDir, 'index.html'));
+fs.copyFileSync(path.join(__dirname, 'styles.css'), path.join(buildDir, 'styles.css'));
+fs.writeFileSync(path.join(buildDir, 'game.js'), gameJsContent);
 
-// Write the processed HTML
-fs.writeFileSync('index.html', html);
-
-console.log('✅ Build completed with environment variables injected');
-console.log(`📡 API Key: ${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 8)}`);
-console.log(`🎮 App ID: ${appId}`); 
+console.log('Build completed! Files are ready in the dist/ directory.'); 

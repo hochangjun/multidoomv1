@@ -1,174 +1,121 @@
-# MultiDoom v1 🔥
+# MULTIDOOM 🔥
 
-A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framework. Battle demons, collect powerups, and compete with up to 8 players simultaneously!
+A real-time multiplayer browser game that runs WITHOUT servers! Built with [Multisynq](https://multisynq.io/)'s revolutionary P2P synchronization technology.
 
-## 🎮 Game Features
+## 🎮 Features
 
-### Core Gameplay
-- **8-Player Multiplayer**: Up to 8 active players with automatic queue system
-- **Real-time Combat**: Smooth WASD movement with mouse aiming
-- **Strategic Map**: Doom-inspired level design with walls and bunkers
-- **Monster AI**: Large Demons that split into smaller Imps when killed
-- **Powerup System**: 4 different powerups dropped by defeated Imps
-
-### Powerups 💥
-- **⚡ Speed Boost**: 50% faster movement for 10 seconds
-- **🛡️ Shield**: Complete invincibility with visual barrier for 10 seconds
-- **💥 Damage Boost**: 2x damage + 2.5x bigger bullets for 10 seconds
-
-### Combat System
-- **Player Health**: 100 HP, 50 damage per hit (2 hits to kill)
-- **Monster Mechanics**: 
-  - Large Demons: 300 HP, 75 damage (1-hit kill)
-  - Small Imps: 150 HP, 37 damage (3 hits to kill)
-- **Knockback Physics**: Players get pushed away when hit by monsters
-- **Invincibility Frames**: 1.5 seconds of immunity after taking damage
-
-### Technical Features
-- **Mobile Responsive**: Dual joystick touch controls
-  - Left joystick: WASD-style movement
-  - Right joystick: Aim direction + continuous shooting
-  - Simultaneous move and shoot capability
-  - Auto-detection for touch devices
-- **Sound Effects**: Procedural audio using Web Audio API
-- **Enhanced Visual Effects**: 
-  - 2.5x bigger bullets for damage boost
-  - Pulsing shield barriers with invincibility
-  - Flashing powerup indicators when expiring
-  - Larger, more visible powerup pickups
-- **Bandwidth Optimized**: Efficient data structures for 10KB message limit
-- **Queue System**: FCFS (First Come, First Served) player management
+- **Real-time Multiplayer Combat** - Battle monsters with other players in real-time
+- **Cross-Platform** - Works on desktop and mobile devices
+- **Touch Controls** - Dual joystick system for mobile gameplay
+- **Spatial Audio** - Immersive sound effects using Web Audio API
+- **Power-ups & Weapons** - Collect upgrades during gameplay
+- **Live Chat** - Communicate with other players
+- **No Server Required** - Uses P2P technology for seamless multiplayer
 
 ## 🚀 Quick Start
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/hochangjun/multidoomv1.git
-   cd multidoomv1
-   ```
+### Prerequisites
+- Node.js (for build process)
+- A Multisynq API key from [multisynq.io/coder](https://multisynq.io/coder)
 
-2. **Open the game**:
-   - Simply open `multiblaster.html` in any modern web browser
-   - Or deploy to any static hosting service (Vercel, Netlify, GitHub Pages)
+### Installation
 
-3. **Play**:
-   - Enter your name in the bottom-left input
-   - Use WASD to move, mouse to aim, click/spacebar to shoot
-   - Mobile: Use touch controls with on-screen joystick
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/multidoom.git
+cd multidoom
+```
+
+2. Copy the environment file and add your credentials:
+```bash
+cp env.example .env
+```
+
+3. Edit `.env` and add your Multisynq credentials:
+```
+MULTISYNQ_API_KEY=your-actual-api-key
+MULTISYNQ_SESSION_NAME=your-session-name
+MULTISYNQ_SESSION_PASSWORD=your-session-password
+```
+
+4. Build and run:
+```bash
+npm run build
+npm run dev
+```
+
+5. Open your browser to `http://localhost:8000`
 
 ## 🎯 Controls
 
 ### Desktop
-- **WASD** or **Arrow Keys**: Movement
-- **Mouse**: Aim direction
-- **Left Click** or **Spacebar**: Shoot
-- **Enter Name**: Bottom-left input field
+- **WASD** - Move player
+- **Mouse** - Aim
+- **Click/Space** - Shoot
+- **Enter** - Chat
 
 ### Mobile
-- **Left Joystick (Green)**: Movement control
-- **Right Joystick (Red)**: Aim direction + continuous shooting
-- **Dual Control**: Move and shoot simultaneously
-- **Auto-detect**: Controls appear automatically on touch devices
+- **Left Joystick** - Move
+- **Right Joystick** - Aim & Shoot
+- **Touch anywhere** - Additional shooting
 
-## 🏗️ Architecture
+## 🏗️ Technical Details
 
-Built with the **Multisynq** multiplayer framework:
-- **Client-side synchronized VMs**: No server-side code needed
-- **Deterministic simulation**: Same game state across all clients
-- **Real-time synchronization**: Sub-100ms latency
-- **Automatic state persistence**: Join/leave seamlessly
+### Architecture
+- **Frontend**: Vanilla JavaScript, HTML5 Canvas
+- **Multiplayer**: Multisynq P2P synchronization
+- **Audio**: Web Audio API
+- **Mobile**: Touch-optimized controls
 
-### Key Components
-- `Game`: Root model managing all game state
-- `Player`: Individual player entities with powerup effects
-- `Monster`: AI-controlled enemies with splitting mechanics
-- `Powerup`: Collectible items with timed effects
-- `Bullet`: Projectiles with enhanced damage variants
-- `GameView`: Rendering and input handling
+### Key Files
+- `game.js` - Main game logic and Multisynq models
+- `styles.css` - UI and mobile control styling
+- `index.html` - Game HTML structure
+- `build.js` - Build script for environment variable injection
 
-## 🔧 Configuration
-
-### Environment Variables
-Set these in your Vercel dashboard under Settings > Environment Variables:
-
-```bash
-MULTISYNQ_API_KEY=your_api_key_from_multisynq.io
-MULTISYNQ_APP_ID=your_unique_app_identifier
-```
-
-### Game Constants
-Key constants in the game code:
-```javascript
-C.MAX_ACTIVE_PLAYERS = 8;        // Maximum simultaneous players
-C.POWERUP_SPAWN_CHANCE = 0.7;    // 70% chance for imp powerup drop
-C.POWERUP_DURATION = 600;        // 10 seconds at 60fps
-C.RESPAWN_TIME = 300;            // 5 seconds respawn delay
-```
+### Performance Optimizations
+- Touch events throttled to 20fps for smooth performance
+- Efficient collision detection
+- Optimized rendering loop
 
 ## 🌐 Deployment
 
 ### Vercel (Recommended)
-1. Push to GitHub
-2. Connect repository to Vercel
-3. **Set Environment Variables** in Vercel Dashboard:
-   - Go to Settings > Environment Variables
-   - Add `MULTISYNQ_API_KEY` with your API key
-   - Add `MULTISYNQ_APP_ID` with your app ID
-4. Deploy as static site
-5. Game supports unlimited concurrent sessions
+
+1. Fork this repository
+2. Connect to Vercel
+3. Add environment variables in Vercel dashboard:
+   - `MULTISYNQ_API_KEY`
+   - `MULTISYNQ_SESSION_NAME`
+   - `MULTISYNQ_SESSION_PASSWORD`
+4. Deploy!
 
 ### Other Platforms
-- **Netlify**: Drag & drop `multiblaster.html`
-- **GitHub Pages**: Enable in repository settings
-- **Any Static Host**: Upload single HTML file
 
-## 🎨 Customization Ideas
-
-### Immediate Improvements
-- **More Powerups**: Invisibility, multi-shot, homing bullets
-- **Map Variants**: Multiple level layouts
-- **Player Customization**: Different colors, skins
-- **Sound Enhancement**: More audio effects, music
-
-### Advanced Features
-- **Pseudo 2.5D Graphics**: Doom-style raycasting renderer
-- **Crypto Integration**: Wagering system with testnet tokens
-- **Tournament Mode**: Bracket-style competitions
-- **Spectator Mode**: Watch games in progress
-
-## 📊 Performance
-
-- **Bandwidth**: ~2-5KB/s per player (well under 10KB limit)
-- **Latency**: <100ms with good internet connection
-- **Scalability**: Tested with 8 concurrent players
-- **Browser Support**: All modern browsers (Chrome, Firefox, Safari, Edge)
-
-## 🐛 Known Issues
-
-- Occasional sync delays with poor network conditions
-- Mobile touch controls may need calibration on some devices
-- Powerup symbols may not display on older browsers
+The build process creates a `dist/` folder with all files ready for static hosting on any platform.
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -m 'Add feature'`
+2. Create a feature branch: `git checkout -b feature-name`
+3. Commit changes: `git commit -am 'Add feature'`
 4. Push to branch: `git push origin feature-name`
-5. Submit pull request
+5. Open a Pull Request
 
-## 📄 License
+## 📝 License
 
-MIT License - feel free to use, modify, and distribute!
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Credits
+## 🙏 Acknowledgments
 
-- **Multisynq Framework**: Real-time multiplayer synchronization
-- **Doom**: Inspiration for game design and aesthetics
-- **Freedoom Project**: Open-source Doom-compatible assets and inspiration
-- **Web Audio API**: Procedural sound generation
-- **Canvas 2D**: Graphics rendering
+- Built with [Multisynq](https://multisynq.io/) - revolutionary multiplayer web framework
+- Inspired by classic arena shooters
+- Special thanks to the Multisynq team for their amazing technology
+
+## 🐛 Issues & Support
+
+Found a bug? Have a feature request? Please open an issue on GitHub!
 
 ---
 
-**Ready to dominate the arena? Deploy and start fragging! 🔫** 
+Made with ❤️ for the multiplayer web gaming community 

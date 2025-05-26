@@ -1,14 +1,24 @@
 {
-  "name": "multidoom-v1",
+  "name": "multidoom",
   "version": "1.0.0",
-  "description": "Multiplayer 2D Doom-style arena shooter",
+  "description": "A real-time multiplayer browser game built with Multisynq",
+  "main": "index.html",
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "dev": "python3 -m http.server 8000",
+    "start": "npm run build && npm run dev"
   },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "webgl",
+    "multisynq",
+    "realtime"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hochangjun/multidoomv1.git"
-  },
-  "author": "hochangjun",
-  "license": "MIT"
+    "url": "https://github.com/yourusername/multidoom.git"
+  }
 } 
