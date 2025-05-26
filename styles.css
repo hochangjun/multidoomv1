@@ -4,11 +4,7 @@ html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
-    touch-action: none;
     background: linear-gradient(45deg, #1a0000, #330000, #1a0000);
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
     font-family: 'Orbitron', 'Courier New', monospace;
     color: #ff6666;
 }
