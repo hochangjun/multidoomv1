@@ -729,7 +729,9 @@ class Game extends Multisynq.Model {
                     const knockbackAngle = Math.atan2(player.y - monster.y, player.x - monster.x);
                     player.knockback(knockbackAngle, C.KNOCKBACK_FORCE);
                     
-                    player.takeDamage(monster.damage);
+                    // Monster damage should be much higher than bullet damage
+                    const monsterDamageAmount = monster.isLarge ? 75 : 37; // Large demons kill in 1-2 hits, imps in 3 hits
+                    player.takeDamage(monsterDamageAmount);
                     
                     if (player.dead) {
                         this.playerKilled(player, null); // No killer for monster kills
@@ -1180,6 +1182,11 @@ class GameView extends Multisynq.View {
         this.mouseY = 0;
         this.keys = {up: false, down: false, left: false, right: false};
         
+        // Optimistic rendering for mobile performance
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.optimisticPlayer = null; // Local player state for smooth movement
+        this.lastInputTime = 0;
+        
         this.setupControls();
         this.smoothing = new WeakMap();
         
@@ -1280,7 +1287,13 @@ class GameView extends Multisynq.View {
         }
         
         if (changed) {
+            this.lastInputTime = performance.now();
             this.publish(this.viewId, "move", this.keys);
+            
+            // Update optimistic player state immediately on mobile
+            if (this.isMobile) {
+                this.updateOptimisticPlayer();
+            }
         }
     }
 
@@ -1375,7 +1388,13 @@ class GameView extends Multisynq.View {
                     
                     if (JSON.stringify(newKeys) !== JSON.stringify(this.keys)) {
                         this.keys = newKeys;
+                        this.lastInputTime = performance.now();
                         this.publish(this.viewId, "move", this.keys);
+                        
+                        // Update optimistic player state immediately on mobile
+                        if (this.isMobile) {
+                            this.updateOptimisticPlayer();
+                        }
                         console.log('Movement updated:', newKeys);
                     }
                 }
@@ -1462,17 +1481,91 @@ class GameView extends Multisynq.View {
         }, { passive: false });
     }
 
+    updateOptimisticPlayer() {
+        const realPlayer = this.model.players.get(this.viewId);
+        if (!realPlayer || realPlayer.dead) return;
+        
+        // Create or update optimistic player state
+        if (!this.optimisticPlayer) {
+            this.optimisticPlayer = {
+                x: realPlayer.x,
+                y: realPlayer.y,
+                angle: realPlayer.angle,
+                health: realPlayer.health,
+                lastUpdate: performance.now()
+            };
+        }
+        
+        // Predict movement based on current input
+        const currentSpeed = realPlayer.speedBoost > 0 ? C.PLAYER_SPEED * 1.5 : C.PLAYER_SPEED;
+        let vx = 0, vy = 0;
+        
+        if (this.keys.up) vy -= currentSpeed;
+        if (this.keys.down) vy += currentSpeed;
+        if (this.keys.left) vx -= currentSpeed;
+        if (this.keys.right) vx += currentSpeed;
+        
+        // Normalize diagonal movement
+        if (vx !== 0 && vy !== 0) {
+            const factor = 0.707;
+            vx *= factor;
+            vy *= factor;
+        }
+        
+        // Update optimistic position
+        const now = performance.now();
+        const deltaTime = (now - this.optimisticPlayer.lastUpdate) / 16; // Normalize to 60fps
+        
+        this.optimisticPlayer.x += vx * deltaTime;
+        this.optimisticPlayer.y += vy * deltaTime;
+        this.optimisticPlayer.lastUpdate = now;
+        
+        // Keep in bounds
+        this.optimisticPlayer.x = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_WIDTH - C.PLAYER_SIZE, this.optimisticPlayer.x));
+        this.optimisticPlayer.y = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_HEIGHT - C.PLAYER_SIZE, this.optimisticPlayer.y));
+    }
+
+    getPlayerForRendering(player) {
+        // Use optimistic player state on mobile for smoother movement
+        if (this.isMobile && player.viewId === this.viewId && this.optimisticPlayer) {
+            const realPlayer = this.model.players.get(this.viewId);
+            if (!realPlayer || realPlayer.dead) return player;
+            
+            // Blend optimistic and real state based on how recent the input was
+            const timeSinceInput = performance.now() - this.lastInputTime;
+            const blendFactor = Math.max(0, Math.min(1, (200 - timeSinceInput) / 200)); // Fade over 200ms
+            
+            if (blendFactor > 0) {
+                return {
+                    ...player,
+                    x: player.x * (1 - blendFactor) + this.optimisticPlayer.x * blendFactor,
+                    y: player.y * (1 - blendFactor) + this.optimisticPlayer.y * blendFactor
+                };
+            }
+        }
+        return player;
+    }
+
     update() {
+        // Update optimistic player state on mobile
+        if (this.isMobile) {
+            this.updateOptimisticPlayer();
+        }
+        
         this.render();
         this.updateUI();
     }
 
     render() {
         // Performance optimization: reduce shadow blur on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        this.shadowMultiplier = isMobile ? 0.5 : 1; // Reduce shadow effects on mobile
+        this.shadowMultiplier = this.isMobile ? 0.3 : 1; // Further reduced shadow effects on mobile
         
         this.ctx.clearRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
+        
+        // Skip some visual effects on mobile for better performance
+        if (this.isMobile) {
+            this.ctx.imageSmoothingEnabled = false; // Disable antialiasing on mobile
+        }
         
         // Draw walls with Doom-style shading
         this.ctx.fillStyle = "#444";
@@ -1497,9 +1590,10 @@ class GameView extends Multisynq.View {
             }
         }
         
-        // Draw players
+        // Draw players (with optimistic rendering on mobile)
         for (const player of this.model.players.values()) {
-            this.drawPlayer(player);
+            const renderPlayer = this.getPlayerForRendering(player);
+            this.drawPlayer(renderPlayer);
         }
         
         // Draw bullets with glow effect
@@ -1531,9 +1625,9 @@ class GameView extends Multisynq.View {
         const shouldFlash = timeLeft < 300 && Math.floor(timeLeft / 10) % 2 === 0; // Flash every 10 frames
         
         if (!shouldFlash) {
-            // Glow effect
+            // Glow effect (reduced on mobile)
             this.ctx.shadowColor = color;
-            this.ctx.shadowBlur = 20;
+            this.ctx.shadowBlur = 20 * this.shadowMultiplier;
             
             // Powerup circle
             this.ctx.fillStyle = color;
