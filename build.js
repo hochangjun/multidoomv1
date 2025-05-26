@@ -3,6 +3,21 @@ const path = require('path');
 
 console.log('🔧 Starting build process...');
 
+// Load environment variables from .env file if it exists
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    console.log('📄 Loading .env file...');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+        const [key, value] = line.split('=');
+        if (key && value && !process.env[key]) {
+            process.env[key] = value.trim();
+        }
+    });
+} else {
+    console.log('⚠️  No .env file found, using system environment variables');
+}
+
 // Check environment variables (without logging sensitive data)
 console.log('📋 Checking environment variables...');
 const hasApiKey = !!process.env.MULTISYNQ_API_KEY;
@@ -53,10 +68,18 @@ if (!fs.existsSync(buildDir)) {
 // Copy all files to dist and replace game.js with the processed version
 fs.copyFileSync(path.join(__dirname, 'index.html'), path.join(buildDir, 'index.html'));
 fs.copyFileSync(path.join(__dirname, 'styles.css'), path.join(buildDir, 'styles.css'));
+// Copy the image file too
+if (fs.existsSync(path.join(__dirname, 'johnwrichkid.jpg'))) {
+    fs.copyFileSync(path.join(__dirname, 'johnwrichkid.jpg'), path.join(buildDir, 'johnwrichkid.jpg'));
+    console.log('🖼️  Copied johnwrichkid.jpg');
+}
 fs.writeFileSync(path.join(buildDir, 'game.js'), gameJsContent);
 
 console.log('🎉 Build completed! Files are ready in the dist/ directory.');
 console.log('📦 Generated files:');
 console.log('  - dist/index.html');
 console.log('  - dist/styles.css');
-console.log('  - dist/game.js (with environment variables)');; 
+console.log('  - dist/game.js (with environment variables)');
+if (fs.existsSync(path.join(buildDir, 'johnwrichkid.jpg'))) {
+    console.log('  - dist/johnwrichkid.jpg');
+} 

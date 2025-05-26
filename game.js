@@ -1015,6 +1015,14 @@ class GameView extends Multisynq.View {
         this.setupControls();
         this.smoothing = new WeakMap();
         
+        // Load monster image
+        this.monsterImage = new Image();
+        this.monsterImage.src = 'johnwrichkid.jpg';
+        this.monsterImageLoaded = false;
+        this.monsterImage.onload = () => {
+            this.monsterImageLoaded = true;
+        };
+        
         // Subscribe to sound events
         this.subscribe(this.model.sessionId, "sound", this.handleSound);
         // Subscribe to chat updates
@@ -1479,29 +1487,48 @@ class GameView extends Multisynq.View {
 
     drawMonster(monster) {
         const glowColor = monster.isLarge ? "#ff0066" : "#ff6600";
-        const bodyColor = monster.isLarge ? "#cc0044" : "#cc4400";
-        const coreColor = monster.isLarge ? "#ff0066" : "#ff6600";
         const label = monster.isLarge ? "DEMON" : "IMP";
         
         // Use smoothed positions
         const {x, y} = this.smoothPos(monster);
         
-        // Monster body with menacing glow
-        this.ctx.shadowColor = glowColor;
-        this.ctx.shadowBlur = (monster.isLarge ? 20 : 15) * this.shadowMultiplier;
-        this.ctx.fillStyle = bodyColor;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, monster.size, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        // Inner core
-        this.ctx.shadowBlur = (monster.isLarge ? 10 : 8) * this.shadowMultiplier;
-        this.ctx.fillStyle = coreColor;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, monster.size * 0.7, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        this.ctx.shadowBlur = 0;
+        // Draw the @johnwrichkid.jpg image if loaded, otherwise fallback to circles
+        if (this.monsterImageLoaded) {
+            // Calculate image size based on monster size
+            const imageSize = monster.size * 2; // Make image diameter = monster size * 2
+            const imageX = x - imageSize / 2;
+            const imageY = y - imageSize / 2;
+            
+            // Add glow effect around the image
+            this.ctx.shadowColor = glowColor;
+            this.ctx.shadowBlur = (monster.isLarge ? 20 : 15) * this.shadowMultiplier;
+            
+            // Draw the image
+            this.ctx.drawImage(this.monsterImage, imageX, imageY, imageSize, imageSize);
+            
+            this.ctx.shadowBlur = 0;
+        } else {
+            // Fallback to original circle rendering if image not loaded
+            const bodyColor = monster.isLarge ? "#cc0044" : "#cc4400";
+            const coreColor = monster.isLarge ? "#ff0066" : "#ff6600";
+            
+            // Monster body with menacing glow
+            this.ctx.shadowColor = glowColor;
+            this.ctx.shadowBlur = (monster.isLarge ? 20 : 15) * this.shadowMultiplier;
+            this.ctx.fillStyle = bodyColor;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, monster.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Inner core
+            this.ctx.shadowBlur = (monster.isLarge ? 10 : 8) * this.shadowMultiplier;
+            this.ctx.fillStyle = coreColor;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, monster.size * 0.7, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.shadowBlur = 0;
+        }
         
         // Health bar
         const barWidth = monster.isLarge ? 40 : 30;
