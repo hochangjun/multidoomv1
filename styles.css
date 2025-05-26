@@ -187,12 +187,14 @@ html, body {
         bottom: 230px !important;
         height: 120px !important;
         font-size: 10px !important;
+        z-index: 1001 !important;
     }
 
     #initials {
         bottom: 180px !important;
         padding: 8px !important;
         font-size: 12px !important;
+        z-index: 1001 !important;
     }
 
     #controls {
