@@ -730,8 +730,11 @@ class Game extends Multisynq.Model {
                     player.knockback(knockbackAngle, C.KNOCKBACK_FORCE);
                     
                     // Monster damage should be much higher than bullet damage
-                    const monsterDamageAmount = monster.isLarge ? 75 : 37; // Large demons kill in 1-2 hits, imps in 3 hits
-                    player.takeDamage(monsterDamageAmount);
+                    if (monster.isLarge) {
+                        player.takeDamage(75); // Large demons kill in 1-2 hits
+                    } else {
+                        player.takeDamage(37); // Small imps kill in 3 hits
+                    }
                     
                     if (player.dead) {
                         this.playerKilled(player, null); // No killer for monster kills
@@ -873,6 +876,25 @@ class Monster extends GameObject {
                 if (!this.wouldCollideWithWalls(this.x, this.y + moveY)) {
                     this.y += moveY;
                 }
+            }
+        }
+        
+        // Check collision with other monsters (prevent overlapping)
+        for (const otherMonster of this.game.monsters) {
+            if (otherMonster === this || otherMonster.dead) continue;
+            
+            const dx = otherMonster.x - this.x;
+            const dy = otherMonster.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = this.size + otherMonster.size + 5; // Small buffer
+            
+            if (dist < minDist && dist > 0) {
+                // Push monsters apart
+                const pushForce = (minDist - dist) / 2;
+                const pushAngle = Math.atan2(dy, dx);
+                
+                this.x -= Math.cos(pushAngle) * pushForce;
+                this.y -= Math.sin(pushAngle) * pushForce;
             }
         }
         
@@ -1182,10 +1204,8 @@ class GameView extends Multisynq.View {
         this.mouseY = 0;
         this.keys = {up: false, down: false, left: false, right: false};
         
-        // Optimistic rendering for mobile performance
+        // Mobile detection for performance optimizations
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        this.optimisticPlayer = null; // Local player state for smooth movement
-        this.lastInputTime = 0;
         
         this.setupControls();
         this.smoothing = new WeakMap();
@@ -1287,13 +1307,7 @@ class GameView extends Multisynq.View {
         }
         
         if (changed) {
-            this.lastInputTime = performance.now();
             this.publish(this.viewId, "move", this.keys);
-            
-            // Update optimistic player state immediately on mobile
-            if (this.isMobile) {
-                this.updateOptimisticPlayer();
-            }
         }
     }
 
@@ -1388,14 +1402,7 @@ class GameView extends Multisynq.View {
                     
                     if (JSON.stringify(newKeys) !== JSON.stringify(this.keys)) {
                         this.keys = newKeys;
-                        this.lastInputTime = performance.now();
                         this.publish(this.viewId, "move", this.keys);
-                        
-                        // Update optimistic player state immediately on mobile
-                        if (this.isMobile) {
-                            this.updateOptimisticPlayer();
-                        }
-                        console.log('Movement updated:', newKeys);
                     }
                 }
                 
@@ -1481,91 +1488,37 @@ class GameView extends Multisynq.View {
         }, { passive: false });
     }
 
-    updateOptimisticPlayer() {
-        const realPlayer = this.model.players.get(this.viewId);
-        if (!realPlayer || realPlayer.dead) return;
-        
-        // Create or update optimistic player state
-        if (!this.optimisticPlayer) {
-            this.optimisticPlayer = {
-                x: realPlayer.x,
-                y: realPlayer.y,
-                angle: realPlayer.angle,
-                health: realPlayer.health,
-                lastUpdate: performance.now()
-            };
+    // Original multiblaster smoothing approach for smooth rendering
+    smoothPos(obj) {
+        if (!this.smoothing.has(obj)) {
+            this.smoothing.set(obj, { x: obj.x, y: obj.y, a: obj.a });
         }
-        
-        // Predict movement based on current input
-        const currentSpeed = realPlayer.speedBoost > 0 ? C.PLAYER_SPEED * 1.5 : C.PLAYER_SPEED;
-        let vx = 0, vy = 0;
-        
-        if (this.keys.up) vy -= currentSpeed;
-        if (this.keys.down) vy += currentSpeed;
-        if (this.keys.left) vx -= currentSpeed;
-        if (this.keys.right) vx += currentSpeed;
-        
-        // Normalize diagonal movement
-        if (vx !== 0 && vy !== 0) {
-            const factor = 0.707;
-            vx *= factor;
-            vy *= factor;
-        }
-        
-        // Update optimistic position
-        const now = performance.now();
-        const deltaTime = (now - this.optimisticPlayer.lastUpdate) / 16; // Normalize to 60fps
-        
-        this.optimisticPlayer.x += vx * deltaTime;
-        this.optimisticPlayer.y += vy * deltaTime;
-        this.optimisticPlayer.lastUpdate = now;
-        
-        // Keep in bounds
-        this.optimisticPlayer.x = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_WIDTH - C.PLAYER_SIZE, this.optimisticPlayer.x));
-        this.optimisticPlayer.y = Math.max(C.PLAYER_SIZE, Math.min(C.MAP_HEIGHT - C.PLAYER_SIZE, this.optimisticPlayer.y));
+        const smoothed = this.smoothing.get(obj);
+        const dx = obj.x - smoothed.x;
+        const dy = obj.y - smoothed.y;
+        if (Math.abs(dx) < 50) smoothed.x += dx * 0.3; else smoothed.x = obj.x;
+        if (Math.abs(dy) < 50) smoothed.y += dy * 0.3; else smoothed.y = obj.y;
+        return smoothed;
     }
 
-    getPlayerForRendering(player) {
-        // Use optimistic player state on mobile for smoother movement
-        if (this.isMobile && player.viewId === this.viewId && this.optimisticPlayer) {
-            const realPlayer = this.model.players.get(this.viewId);
-            if (!realPlayer || realPlayer.dead) return player;
-            
-            // Blend optimistic and real state based on how recent the input was
-            const timeSinceInput = performance.now() - this.lastInputTime;
-            const blendFactor = Math.max(0, Math.min(1, (200 - timeSinceInput) / 200)); // Fade over 200ms
-            
-            if (blendFactor > 0) {
-                return {
-                    ...player,
-                    x: player.x * (1 - blendFactor) + this.optimisticPlayer.x * blendFactor,
-                    y: player.y * (1 - blendFactor) + this.optimisticPlayer.y * blendFactor
-                };
-            }
-        }
-        return player;
+    // Same for angle
+    smoothPosAndAngle(obj) {
+        const smoothed = this.smoothPos(obj);
+        const da = obj.a - smoothed.a;
+        if (Math.abs(da) < 1) smoothed.a += da * 0.3; else smoothed.a = obj.a;
+        return smoothed;
     }
 
     update() {
-        // Update optimistic player state on mobile
-        if (this.isMobile) {
-            this.updateOptimisticPlayer();
-        }
-        
         this.render();
         this.updateUI();
     }
 
     render() {
         // Performance optimization: reduce shadow blur on mobile
-        this.shadowMultiplier = this.isMobile ? 0.3 : 1; // Further reduced shadow effects on mobile
+        this.shadowMultiplier = this.isMobile ? 0.5 : 1;
         
         this.ctx.clearRect(0, 0, C.MAP_WIDTH, C.MAP_HEIGHT);
-        
-        // Skip some visual effects on mobile for better performance
-        if (this.isMobile) {
-            this.ctx.imageSmoothingEnabled = false; // Disable antialiasing on mobile
-        }
         
         // Draw walls with Doom-style shading
         this.ctx.fillStyle = "#444";
@@ -1583,20 +1536,19 @@ class GameView extends Multisynq.View {
             this.drawPowerup(powerup);
         }
         
-        // Draw monsters
+        // Draw monsters with smoothed positions
         for (const monster of this.model.monsters) {
             if (!monster.dead) {
                 this.drawMonster(monster);
             }
         }
         
-        // Draw players (with optimistic rendering on mobile)
+        // Draw players with smoothed positions
         for (const player of this.model.players.values()) {
-            const renderPlayer = this.getPlayerForRendering(player);
-            this.drawPlayer(renderPlayer);
+            this.drawPlayer(player);
         }
         
-        // Draw bullets with glow effect
+        // Draw bullets with smoothed positions  
         for (const bullet of this.model.bullets) {
             this.drawBullet(bullet);
         }
@@ -1605,6 +1557,9 @@ class GameView extends Multisynq.View {
     drawPowerup(powerup) {
         const time = this.now() / 100; // For animation
         const bobY = Math.sin(time + powerup.bobOffset) * 3; // Floating animation
+        
+        // Use smoothed positions
+        const {x, y} = this.smoothPos(powerup);
         
         const colors = {
             speed: '#00ffff',    // Cyan
@@ -1632,13 +1587,13 @@ class GameView extends Multisynq.View {
             // Powerup circle
             this.ctx.fillStyle = color;
             this.ctx.beginPath();
-            this.ctx.arc(powerup.x, powerup.y + bobY, 12, 0, Math.PI * 2);
+            this.ctx.arc(x, y + bobY, 12, 0, Math.PI * 2);
             this.ctx.fill();
             
             // Inner circle
             this.ctx.fillStyle = '#ffffff';
             this.ctx.beginPath();
-            this.ctx.arc(powerup.x, powerup.y + bobY, 8, 0, Math.PI * 2);
+            this.ctx.arc(x, y + bobY, 8, 0, Math.PI * 2);
             this.ctx.fill();
             
             this.ctx.shadowBlur = 0;
@@ -1647,7 +1602,7 @@ class GameView extends Multisynq.View {
             this.ctx.fillStyle = color;
             this.ctx.font = 'bold 16px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(symbols[powerup.type] || '?', powerup.x, powerup.y + bobY + 6);
+            this.ctx.fillText(symbols[powerup.type] || '?', x, y + bobY + 6);
         }
     }
 
@@ -1657,19 +1612,22 @@ class GameView extends Multisynq.View {
         const coreColor = monster.isLarge ? "#ff0066" : "#ff6600";
         const label = monster.isLarge ? "DEMON" : "IMP";
         
+        // Use smoothed positions
+        const {x, y} = this.smoothPos(monster);
+        
         // Monster body with menacing glow
         this.ctx.shadowColor = glowColor;
         this.ctx.shadowBlur = (monster.isLarge ? 20 : 15) * this.shadowMultiplier;
         this.ctx.fillStyle = bodyColor;
         this.ctx.beginPath();
-        this.ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+        this.ctx.arc(x, y, monster.size, 0, Math.PI * 2);
         this.ctx.fill();
         
         // Inner core
         this.ctx.shadowBlur = (monster.isLarge ? 10 : 8) * this.shadowMultiplier;
         this.ctx.fillStyle = coreColor;
         this.ctx.beginPath();
-        this.ctx.arc(monster.x, monster.y, monster.size * 0.7, 0, Math.PI * 2);
+        this.ctx.arc(x, y, monster.size * 0.7, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.shadowBlur = 0;
@@ -1677,8 +1635,8 @@ class GameView extends Multisynq.View {
         // Health bar
         const barWidth = monster.isLarge ? 40 : 30;
         const barHeight = monster.isLarge ? 8 : 6;
-        const barX = monster.x - barWidth / 2;
-        const barY = monster.y - monster.size - 15;
+        const barX = x - barWidth / 2;
+        const barY = y - monster.size - 15;
         
         // Background
         this.ctx.fillStyle = "#330000";
@@ -1695,7 +1653,7 @@ class GameView extends Multisynq.View {
         this.ctx.fillStyle = "#ffffff";
         this.ctx.font = `bold ${monster.isLarge ? 10 : 8}px Orbitron, monospace`;
         this.ctx.textAlign = "center";
-        this.ctx.fillText(label, monster.x, monster.y + monster.size + 25);
+        this.ctx.fillText(label, x, y + monster.size + 25);
         this.ctx.shadowBlur = 0;
     }
 
@@ -1705,24 +1663,30 @@ class GameView extends Multisynq.View {
         const glowColor = isDamageBoost ? "#ff6600" : "#ffff00";
         const coreColor = isDamageBoost ? "#ff3300" : "#ffffff";
         
+        // Use smoothed positions
+        const {x, y} = this.smoothPos(bullet);
+        
         // Glow effect
         this.ctx.shadowColor = glowColor;
         this.ctx.shadowBlur = isDamageBoost ? 20 : 10;
         this.ctx.fillStyle = glowColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, bullet.size + (isDamageBoost ? 3 : 1), 0, Math.PI * 2);
+        this.ctx.arc(x, y, bullet.size + (isDamageBoost ? 3 : 1), 0, Math.PI * 2);
         this.ctx.fill();
         
         // Core bullet
         this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = coreColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+        this.ctx.arc(x, y, bullet.size, 0, Math.PI * 2);
         this.ctx.fill();
     }
 
     drawPlayer(player) {
         const isMe = player.viewId === this.viewId;
+        
+        // Use smoothed positions for all players
+        const {x, y, a} = this.smoothPosAndAngle(player);
         
         // Invincibility blinking when hit (but not for shield)
         if (player.invincible > 0 && player.shield === 0 && Math.floor(player.invincible / 5) % 2 === 0) {
@@ -1739,13 +1703,13 @@ class GameView extends Multisynq.View {
             this.ctx.strokeStyle = `rgba(0, 255, 0, ${shieldAlpha})`;
             this.ctx.lineWidth = 4;
             this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.arc(x, y, shieldRadius, 0, Math.PI * 2);
             this.ctx.stroke();
             
             // Inner shield glow
             this.ctx.fillStyle = `rgba(0, 255, 0, ${shieldAlpha * 0.3})`;
             this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.arc(x, y, shieldRadius, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.shadowBlur = 0;
         }
@@ -1768,7 +1732,7 @@ class GameView extends Multisynq.View {
         
         this.ctx.fillStyle = player.dead ? "#666" : (isMe ? "#00ff00" : "#ff3333");
         this.ctx.beginPath();
-        this.ctx.arc(player.x, player.y, C.PLAYER_SIZE, 0, Math.PI * 2);
+        this.ctx.arc(x, y, C.PLAYER_SIZE, 0, Math.PI * 2);
         this.ctx.fill();
         
         this.ctx.shadowBlur = 0;
@@ -1780,10 +1744,10 @@ class GameView extends Multisynq.View {
             this.ctx.strokeStyle = "#ffffff";
             this.ctx.lineWidth = 3;
             this.ctx.beginPath();
-            this.ctx.moveTo(player.x, player.y);
+            this.ctx.moveTo(x, y);
             this.ctx.lineTo(
-                player.x + Math.cos(player.angle) * C.PLAYER_SIZE * 1.5,
-                player.y + Math.sin(player.angle) * C.PLAYER_SIZE * 1.5
+                x + Math.cos(a) * C.PLAYER_SIZE * 1.5,
+                y + Math.sin(a) * C.PLAYER_SIZE * 1.5
             );
             this.ctx.stroke();
             this.ctx.shadowBlur = 0;
@@ -1793,8 +1757,8 @@ class GameView extends Multisynq.View {
         if (!player.dead) {
             const barWidth = 24;
             const barHeight = 6;
-            const barX = player.x - barWidth / 2;
-            const barY = player.y - C.PLAYER_SIZE - 12;
+            const barX = x - barWidth / 2;
+            const barY = y - C.PLAYER_SIZE - 12;
             
             // Background
             this.ctx.fillStyle = "#330000";
@@ -1816,7 +1780,7 @@ class GameView extends Multisynq.View {
         this.ctx.font = "bold 12px Orbitron, monospace";
         this.ctx.textAlign = "center";
         const name = player.name || `Marine ${Array.from(this.model.players.keys()).indexOf(player.viewId) + 1}`;
-        this.ctx.fillText(`${name} [${player.score}]`, player.x, player.y + C.PLAYER_SIZE + 20);
+        this.ctx.fillText(`${name} [${player.score}]`, x, y + C.PLAYER_SIZE + 20);
         this.ctx.shadowBlur = 0;
         
         // Powerup indicators with flashing when about to expire
@@ -1842,7 +1806,7 @@ class GameView extends Multisynq.View {
                 this.ctx.shadowBlur = 3;
                 this.ctx.fillStyle = "#ffffff";
                 this.ctx.font = "bold 14px Arial";
-                this.ctx.fillText(powerupText, player.x, player.y + C.PLAYER_SIZE + 35);
+                this.ctx.fillText(powerupText, x, y + C.PLAYER_SIZE + 35);
                 this.ctx.shadowBlur = 0;
             }
         }
