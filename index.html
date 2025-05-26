@@ -668,7 +668,7 @@ class Game extends Multisynq.Model {
         const aliveMonsters = Array.from(this.gameEntities.monsters).filter(m => !m.dead);
         if (aliveMonsters.length === 0) {
             // Respawn large monster after delay
-            this.future(15000).gameEntities.spawnMonster(); // 15 seconds
+            this.gameEntities.future(15000).spawnMonster(); // Corrected future call
         }
     }
 
@@ -844,7 +844,7 @@ Game.register("Game");
 class GameObject extends Multisynq.Model {
     get game() { return this.wellKnownModel("modelRoot"); }
     
-    init() {
+    init(_options) {
         this.x = 0;
         this.y = 0;
         this.destroyed = false;
@@ -1065,7 +1065,7 @@ class Player extends GameObject {
         const bulletY = this.y + Math.sin(this.angle) * C.PLAYER_SIZE;
         
         const bulletDamage = this.damageBoost > 0 ? 40 : 20; // 5 hits to kill (20x5=100), damage boost = 2.5 hits to kill
-        const bulletSize = this.damageBoost > 0 ? C.BULLET_SIZE * 2.5 : C.BULLET_SIZE; // Much bigger bullets
+        const bulletSize = this.damageBoost > 0 ? C.BULLET_SIZE * 5 : C.BULLET_SIZE; // Much bigger bullets
         
         Bullet.create({
             x: bulletX,
