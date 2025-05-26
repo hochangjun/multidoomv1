@@ -13,9 +13,8 @@ A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framewo
 
 ### Powerups 💥
 - **⚡ Speed Boost**: 50% faster movement for 10 seconds
-- **🔥 Rapid Fire**: 50% faster shooting rate for 10 seconds  
-- **🛡️ Shield**: 50% damage reduction for 10 seconds
-- **💥 Damage Boost**: 50% more bullet damage for 10 seconds
+- **🛡️ Shield**: Complete invincibility with visual barrier for 10 seconds
+- **💥 Damage Boost**: 2x damage + 2.5x bigger bullets for 10 seconds
 
 ### Combat System
 - **Player Health**: 100 HP, 50 damage per hit (2 hits to kill)
@@ -28,7 +27,11 @@ A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framewo
 ### Technical Features
 - **Mobile Responsive**: Touch controls with on-screen joystick
 - **Sound Effects**: Procedural audio using Web Audio API
-- **Visual Effects**: Glowing bullets, health bars, powerup animations
+- **Enhanced Visual Effects**: 
+  - 2.5x bigger bullets for damage boost
+  - Pulsing shield barriers with invincibility
+  - Flashing powerup indicators when expiring
+  - Larger, more visible powerup pickups
 - **Bandwidth Optimized**: Efficient data structures for 10KB message limit
 - **Queue System**: FCFS (First Come, First Served) player management
 
@@ -144,6 +147,7 @@ MIT License - feel free to use, modify, and distribute!
 
 - **Multisynq Framework**: Real-time multiplayer synchronization
 - **Doom**: Inspiration for game design and aesthetics
+- **Freedoom Project**: Open-source Doom-compatible assets and inspiration
 - **Web Audio API**: Procedural sound generation
 - **Canvas 2D**: Graphics rendering
 

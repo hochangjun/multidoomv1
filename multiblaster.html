@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
         <title>DOOM Arena</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><text x='16' y='20' text-anchor='middle' fill='%23ff3333' font-family='monospace' font-size='16' font-weight='bold'>D</text></svg>" type="image/svg+xml">
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
             
@@ -466,7 +467,7 @@ class Game extends Multisynq.Model {
     }
 
     spawnPowerup(x, y) {
-        const types = ['speed', 'rapidfire', 'shield', 'damage'];
+        const types = ['speed', 'shield', 'damage']; // Removed rapidfire
         const type = types[Math.floor(Math.random() * types.length)];
         
         Powerup.create({
@@ -507,7 +508,7 @@ class Game extends Multisynq.Model {
                 const dy = bullet.y - player.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 
-                if (dist < C.PLAYER_SIZE + C.BULLET_SIZE) {
+                if (dist < C.PLAYER_SIZE + bullet.size) {
                     const shooter = this.players.get(bullet.shooterId);
                     player.takeDamage(bullet.damage || 50);
                     bullet.destroy();
@@ -531,7 +532,7 @@ class Game extends Multisynq.Model {
                 const dy = bullet.y - monster.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 
-                if (dist < monster.size + C.BULLET_SIZE) {
+                if (dist < monster.size + bullet.size) {
                     monster.takeDamage(bullet.damage || 25); // Monster takes less damage per bullet
                     bullet.destroy();
                     
@@ -791,7 +792,6 @@ class Player extends GameObject {
         
         // Powerup effects
         this.speedBoost = 0;
-        this.rapidFire = 0;
         this.shield = 0;
         this.damageBoost = 0;
         
@@ -814,14 +814,14 @@ class Player extends GameObject {
     }
 
     handleShoot() {
-        const shootCooldown = this.rapidFire > 0 ? 100 : 200; // Faster shooting with rapid fire
-        if (this.dead || this.now() - this.lastShot < shootCooldown) return;
+        if (this.dead || this.now() - this.lastShot < 200) return; // 200ms cooldown
         
         this.lastShot = this.now();
         const bulletX = this.x + Math.cos(this.angle) * C.PLAYER_SIZE;
         const bulletY = this.y + Math.sin(this.angle) * C.PLAYER_SIZE;
         
-        const bulletDamage = this.damageBoost > 0 ? 75 : 50; // Increased damage with powerup
+        const bulletDamage = this.damageBoost > 0 ? 100 : 50; // Increased damage with powerup
+        const bulletSize = this.damageBoost > 0 ? C.BULLET_SIZE * 2.5 : C.BULLET_SIZE; // Much bigger bullets
         
         Bullet.create({
             x: bulletX,
@@ -829,7 +829,8 @@ class Player extends GameObject {
             vx: Math.cos(this.angle) * C.BULLET_SPEED,
             vy: Math.sin(this.angle) * C.BULLET_SPEED,
             shooterId: this.viewId,
-            damage: bulletDamage
+            damage: bulletDamage,
+            size: bulletSize
         });
         
         // Broadcast sound to all players
@@ -850,11 +851,9 @@ class Player extends GameObject {
             case 'speed':
                 this.speedBoost = C.POWERUP_DURATION;
                 break;
-            case 'rapidfire':
-                this.rapidFire = C.POWERUP_DURATION;
-                break;
             case 'shield':
                 this.shield = C.POWERUP_DURATION;
+                this.invincible = C.POWERUP_DURATION; // Shield provides invincibility
                 break;
             case 'damage':
                 this.damageBoost = C.POWERUP_DURATION;
@@ -881,8 +880,11 @@ class Player extends GameObject {
         
         // Update powerup timers
         if (this.speedBoost > 0) this.speedBoost--;
-        if (this.rapidFire > 0) this.rapidFire--;
-        if (this.shield > 0) this.shield--;
+        if (this.shield > 0) {
+            this.shield--;
+            // Keep invincible while shield is active
+            if (this.shield > 0) this.invincible = Math.max(this.invincible, 1);
+        }
         if (this.damageBoost > 0) this.damageBoost--;
         
         // Apply movement
@@ -940,9 +942,9 @@ class Player extends GameObject {
     }
 
     takeDamage(amount = 50) {
-        // Shield reduces damage by half
+        // Shield provides complete invincibility
         if (this.shield > 0) {
-            amount = Math.floor(amount / 2);
+            return; // No damage taken
         }
         
         this.health -= amount;
@@ -963,7 +965,7 @@ class Player extends GameObject {
 Player.register("Player");
 
 class Bullet extends GameObject {
-    init({x, y, vx, vy, shooterId, damage}) {
+    init({x, y, vx, vy, shooterId, damage, size}) {
         super.init();
         this.x = x;
         this.y = y;
@@ -971,6 +973,7 @@ class Bullet extends GameObject {
         this.vy = vy;
         this.shooterId = shooterId;
         this.damage = damage || 50;
+        this.size = size || C.BULLET_SIZE;
         this.lifetime = C.BULLET_LIFETIME;
         this.game.bullets.add(this);
     }
@@ -1242,43 +1245,47 @@ class GameView extends Multisynq.View {
         
         const colors = {
             speed: '#00ffff',    // Cyan
-            rapidfire: '#ffff00', // Yellow
             shield: '#00ff00',   // Green
             damage: '#ff6600'    // Orange
         };
         
         const symbols = {
             speed: '⚡',
-            rapidfire: '🔥',
             shield: '🛡️',
             damage: '💥'
         };
         
         const color = colors[powerup.type] || '#ffffff';
         
-        // Glow effect
-        this.ctx.shadowColor = color;
-        this.ctx.shadowBlur = 15;
+        // Flash when about to expire (last 5 seconds)
+        const timeLeft = powerup.lifetime;
+        const shouldFlash = timeLeft < 300 && Math.floor(timeLeft / 10) % 2 === 0; // Flash every 10 frames
         
-        // Powerup circle
-        this.ctx.fillStyle = color;
-        this.ctx.beginPath();
-        this.ctx.arc(powerup.x, powerup.y + bobY, 8, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        // Inner circle
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.beginPath();
-        this.ctx.arc(powerup.x, powerup.y + bobY, 5, 0, Math.PI * 2);
-        this.ctx.fill();
-        
-        this.ctx.shadowBlur = 0;
-        
-        // Symbol
-        this.ctx.fillStyle = color;
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(symbols[powerup.type] || '?', powerup.x, powerup.y + bobY + 4);
+        if (!shouldFlash) {
+            // Glow effect
+            this.ctx.shadowColor = color;
+            this.ctx.shadowBlur = 20;
+            
+            // Powerup circle
+            this.ctx.fillStyle = color;
+            this.ctx.beginPath();
+            this.ctx.arc(powerup.x, powerup.y + bobY, 12, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Inner circle
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.arc(powerup.x, powerup.y + bobY, 8, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.shadowBlur = 0;
+            
+            // Symbol
+            this.ctx.fillStyle = color;
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(symbols[powerup.type] || '?', powerup.x, powerup.y + bobY + 6);
+        }
     }
 
     drawMonster(monster) {
@@ -1337,17 +1344,17 @@ class GameView extends Multisynq.View {
         
         // Glow effect
         this.ctx.shadowColor = glowColor;
-        this.ctx.shadowBlur = isDamageBoost ? 15 : 10;
+        this.ctx.shadowBlur = isDamageBoost ? 20 : 10;
         this.ctx.fillStyle = glowColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, C.BULLET_SIZE + (isDamageBoost ? 2 : 1), 0, Math.PI * 2);
+        this.ctx.arc(bullet.x, bullet.y, bullet.size + (isDamageBoost ? 3 : 1), 0, Math.PI * 2);
         this.ctx.fill();
         
         // Core bullet
         this.ctx.shadowBlur = 0;
         this.ctx.fillStyle = coreColor;
         this.ctx.beginPath();
-        this.ctx.arc(bullet.x, bullet.y, C.BULLET_SIZE, 0, Math.PI * 2);
+        this.ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
         this.ctx.fill();
     }
 
@@ -1359,13 +1366,33 @@ class GameView extends Multisynq.View {
             return; // Skip drawing every 5 frames for flashing effect
         }
         
+        // Shield visual effect - draw first so it's behind player
+        if (!player.dead && player.shield > 0) {
+            const shieldRadius = C.PLAYER_SIZE + 8;
+            const shieldAlpha = 0.3 + 0.2 * Math.sin(this.now() / 100); // Pulsing effect
+            
+            this.ctx.shadowColor = "#00ff00";
+            this.ctx.shadowBlur = 15;
+            this.ctx.strokeStyle = `rgba(0, 255, 0, ${shieldAlpha})`;
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath();
+            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Inner shield glow
+            this.ctx.fillStyle = `rgba(0, 255, 0, ${shieldAlpha * 0.3})`;
+            this.ctx.beginPath();
+            this.ctx.arc(player.x, player.y, shieldRadius, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.shadowBlur = 0;
+        }
+        
         // Player body with glow and powerup effects
         if (!player.dead) {
             let glowColor = isMe ? "#00ff00" : "#ff0000";
             
             // Powerup glow effects
             if (player.speedBoost > 0) glowColor = "#00ffff";
-            else if (player.rapidFire > 0) glowColor = "#ffff00";
             else if (player.shield > 0) glowColor = "#00ff00";
             else if (player.damageBoost > 0) glowColor = "#ff6600";
             
@@ -1429,18 +1456,31 @@ class GameView extends Multisynq.View {
         this.ctx.fillText(`${name} [${player.score}]`, player.x, player.y + C.PLAYER_SIZE + 20);
         this.ctx.shadowBlur = 0;
         
-        // Powerup indicators
+        // Powerup indicators with flashing when about to expire
         if (isMe && !player.dead) {
             let powerupText = '';
-            if (player.speedBoost > 0) powerupText += '⚡ ';
-            if (player.rapidFire > 0) powerupText += '🔥 ';
-            if (player.shield > 0) powerupText += '🛡️ ';
-            if (player.damageBoost > 0) powerupText += '💥 ';
+            const flashThreshold = 120; // Flash in last 2 seconds
+            
+            if (player.speedBoost > 0) {
+                const shouldFlash = player.speedBoost < flashThreshold && Math.floor(player.speedBoost / 10) % 2 === 0;
+                if (!shouldFlash) powerupText += '⚡ ';
+            }
+            if (player.shield > 0) {
+                const shouldFlash = player.shield < flashThreshold && Math.floor(player.shield / 10) % 2 === 0;
+                if (!shouldFlash) powerupText += '🛡️ ';
+            }
+            if (player.damageBoost > 0) {
+                const shouldFlash = player.damageBoost < flashThreshold && Math.floor(player.damageBoost / 10) % 2 === 0;
+                if (!shouldFlash) powerupText += '💥 ';
+            }
             
             if (powerupText) {
+                this.ctx.shadowColor = "#ffffff";
+                this.ctx.shadowBlur = 3;
                 this.ctx.fillStyle = "#ffffff";
-                this.ctx.font = "10px Arial";
+                this.ctx.font = "bold 14px Arial";
                 this.ctx.fillText(powerupText, player.x, player.y + C.PLAYER_SIZE + 35);
+                this.ctx.shadowBlur = 0;
             }
         }
     }
