@@ -387,22 +387,83 @@ C.POWERUP_DURATION = 600; // 10 seconds at 60fps
 C.POWERUP_SPAWN_CHANCE = 0.7; // 70% chance for imp to drop powerup
 C.POWERUP_LIFETIME = 1800; // 30 seconds before disappearing
 
-// Game root model
+// Separate model chunks to avoid 10k message limit
+class GameEntities extends Multisynq.Model {
+    init() {
+        this.bullets = new Set();
+        this.monsters = new Set();
+        this.powerups = new Set();
+    }
+    
+    get game() { return this.wellKnownModel("modelRoot"); }
+    
+    spawnMonster() {
+        // Spawn large monster in center area
+        Monster.create({
+            x: C.MAP_WIDTH / 2,
+            y: C.MAP_HEIGHT / 2,
+            isLarge: true
+        });
+    }
+}
+GameEntities.register("GameEntities");
+
+class GameStatic extends Multisynq.Model {
+    init() {
+        this.walls = new Set();
+    }
+    
+    get game() { return this.wellKnownModel("modelRoot"); }
+    
+    createWalls() {
+        // Create strategic wall layout - more Doom-like
+        const walls = [
+            // Outer walls
+            {x: 0, y: 0, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // top
+            {x: 0, y: C.MAP_HEIGHT - C.WALL_THICKNESS, w: C.MAP_WIDTH, h: C.WALL_THICKNESS}, // bottom
+            {x: 0, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // left
+            {x: C.MAP_WIDTH - C.WALL_THICKNESS, y: 0, w: C.WALL_THICKNESS, h: C.MAP_HEIGHT}, // right
+            
+            // Central cross structure
+            {x: 350, y: 200, w: 100, h: C.WALL_THICKNESS}, // horizontal center
+            {x: 380, y: 150, w: C.WALL_THICKNESS, h: 100}, // vertical center
+            
+            // Corner bunkers
+            {x: 100, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-left bunker
+            {x: 100, y: 100, w: C.WALL_THICKNESS, h: 80},
+            {x: 620, y: 100, w: 80, h: C.WALL_THICKNESS}, // top-right bunker
+            {x: 680, y: 100, w: C.WALL_THICKNESS, h: 80},
+            {x: 100, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-left bunker
+            {x: 100, y: 480, w: C.WALL_THICKNESS, h: 80},
+            {x: 620, y: 480, w: 80, h: C.WALL_THICKNESS}, // bottom-right bunker
+            {x: 680, y: 480, w: C.WALL_THICKNESS, h: 80},
+            
+            // Side corridors
+            {x: 250, y: 350, w: C.WALL_THICKNESS, h: 100}, // left corridor
+            {x: 530, y: 350, w: C.WALL_THICKNESS, h: 100}, // right corridor
+        ];
+        
+        walls.forEach(wall => Wall.create(wall));
+    }
+}
+GameStatic.register("GameStatic");
+
+// Game root model - split into chunks to avoid 10k message limit
 class Game extends Multisynq.Model {
     init(_, persisted) {
         this.players = new Map(); // active players
         this.queue = []; // waiting players
-        this.bullets = new Set();
-        this.walls = new Set();
-        this.monsters = new Set();
-        this.powerups = new Set();
         this.scores = persisted?.scores ?? {};
+        
+        // Create separate model chunks to avoid 10k limit
+        this.gameEntities = GameEntities.create({}); // bullets, monsters, powerups
+        this.gameStatic = GameStatic.create({}); // walls and static data
         
         this.subscribe(this.sessionId, "view-join", this.viewJoined);
         this.subscribe(this.sessionId, "view-exit", this.viewExited);
         
-        this.createWalls();
-        this.spawnMonster();
+        this.gameStatic.createWalls();
+        this.gameEntities.spawnMonster();
         this.mainLoop();
     }
 
@@ -520,7 +581,7 @@ class Game extends Multisynq.Model {
         }
         
         // Check walls
-        for (const wall of this.walls) {
+        for (const wall of this.gameStatic.walls) {
             if (x - radius < wall.x + wall.w &&
                 x + radius > wall.x &&
                 y - radius < wall.y + wall.h &&
@@ -531,7 +592,7 @@ class Game extends Multisynq.Model {
         
         // Check distance from monsters (only for player spawns)
         if (radius === C.PLAYER_SIZE) {
-            for (const monster of this.monsters) {
+            for (const monster of this.gameEntities.monsters) {
                 if (monster.dead) continue;
                 const dx = x - monster.x;
                 const dy = y - monster.y;
@@ -604,10 +665,10 @@ class Game extends Multisynq.Model {
         }
         
         // Check if all monsters are dead
-        const aliveMonsters = Array.from(this.monsters).filter(m => !m.dead);
+        const aliveMonsters = Array.from(this.gameEntities.monsters).filter(m => !m.dead);
         if (aliveMonsters.length === 0) {
             // Respawn large monster after delay
-            this.future(15000).spawnMonster(); // 15 seconds
+            this.future(15000).gameEntities.spawnMonster(); // 15 seconds
         }
     }
 
@@ -645,15 +706,15 @@ class Game extends Multisynq.Model {
         for (const player of this.players.values()) {
             player.update();
         }
-        for (const bullet of this.bullets) {
+        for (const bullet of this.gameEntities.bullets) {
             bullet.update();
         }
-        for (const monster of this.monsters) {
+        for (const monster of this.gameEntities.monsters) {
             if (!monster.dead) {
                 monster.update();
             }
         }
-        for (const powerup of this.powerups) {
+        for (const powerup of this.gameEntities.powerups) {
             powerup.update();
         }
         this.checkCollisions();
@@ -662,7 +723,7 @@ class Game extends Multisynq.Model {
 
     checkCollisions() {
         // Bullet vs Player collisions
-        for (const bullet of this.bullets) {
+        for (const bullet of this.gameEntities.bullets) {
             if (bullet.destroyed) continue;
             
             for (const player of this.players.values()) {
@@ -686,10 +747,10 @@ class Game extends Multisynq.Model {
         }
         
         // Bullet vs Monster collisions
-        for (const monster of this.monsters) {
+        for (const monster of this.gameEntities.monsters) {
             if (monster.dead) continue;
             
-            for (const bullet of this.bullets) {
+            for (const bullet of this.gameEntities.bullets) {
                 if (bullet.destroyed) continue;
                 
                 const dx = bullet.x - monster.x;
@@ -714,7 +775,7 @@ class Game extends Multisynq.Model {
         }
         
         // Monster vs Player collisions
-        for (const monster of this.monsters) {
+        for (const monster of this.gameEntities.monsters) {
             if (monster.dead) continue;
             
             for (const player of this.players.values()) {
@@ -740,7 +801,7 @@ class Game extends Multisynq.Model {
         }
         
         // Player vs Powerup collisions
-        for (const powerup of this.powerups) {
+        for (const powerup of this.gameEntities.powerups) {
             if (powerup.destroyed) continue;
             
             for (const player of this.players.values()) {
@@ -759,10 +820,10 @@ class Game extends Multisynq.Model {
         }
         
         // Bullet vs Wall collisions
-        for (const bullet of this.bullets) {
+        for (const bullet of this.gameEntities.bullets) {
             if (bullet.destroyed) continue;
             
-            for (const wall of this.walls) {
+            for (const wall of this.gameStatic.walls) {
                 if (this.bulletWallCollision(bullet, wall)) {
                     bullet.destroy();
                     break;
@@ -797,11 +858,11 @@ class Wall extends GameObject {
         this.y = y;
         this.w = w;
         this.h = h;
-        this.game.walls.add(this);
+        this.game.gameStatic.walls.add(this);
     }
     
     destroy() {
-        this.game.walls.delete(this);
+        this.game.gameStatic.walls.delete(this);
         super.destroy();
     }
 }
@@ -831,7 +892,7 @@ class Monster extends GameObject {
         this.dead = false;
         this.target = null;
         this.lastDamageTime = 0;
-        this.game.monsters.add(this);
+        this.game.gameEntities.monsters.add(this);
     }
 
     update() {
@@ -875,7 +936,7 @@ class Monster extends GameObject {
         }
         
         // Check collision with other monsters (prevent overlapping)
-        for (const otherMonster of this.game.monsters) {
+        for (const otherMonster of this.game.gameEntities.monsters) {
             if (otherMonster === this || otherMonster.dead) continue;
             
             const dx = otherMonster.x - this.x;
@@ -899,7 +960,7 @@ class Monster extends GameObject {
     }
 
     wouldCollideWithWalls(x, y) {
-        for (const wall of this.game.walls) {
+        for (const wall of this.game.gameStatic.walls) {
             if (x - this.size < wall.x + wall.w &&
                 x + this.size > wall.x &&
                 y - this.size < wall.y + wall.h &&
@@ -923,7 +984,7 @@ class Monster extends GameObject {
     }
 
     destroy() {
-        this.game.monsters.delete(this);
+        this.game.gameEntities.monsters.delete(this);
         super.destroy();
     }
 }
@@ -937,7 +998,7 @@ class Powerup extends GameObject {
         this.type = type; // 'speed', 'rapidfire', 'shield', 'damage'
         this.lifetime = C.POWERUP_LIFETIME;
         this.bobOffset = Math.random() * Math.PI * 2; // For floating animation
-        this.game.powerups.add(this);
+        this.game.gameEntities.powerups.add(this);
     }
 
     update() {
@@ -949,7 +1010,7 @@ class Powerup extends GameObject {
 
     destroy() {
         this.destroyed = true;
-        this.game.powerups.delete(this);
+        this.game.gameEntities.powerups.delete(this);
         super.destroy();
     }
 }
@@ -1109,7 +1170,7 @@ class Player extends GameObject {
     }
 
     wouldCollideWithWalls(x, y) {
-        for (const wall of this.game.walls) {
+        for (const wall of this.game.gameStatic.walls) {
             if (x - C.PLAYER_SIZE < wall.x + wall.w &&
                 x + C.PLAYER_SIZE > wall.x &&
                 y - C.PLAYER_SIZE < wall.y + wall.h &&
@@ -1163,7 +1224,7 @@ class Bullet extends GameObject {
         this.damage = damage || 20;
         this.size = size || C.BULLET_SIZE;
         this.lifetime = C.BULLET_LIFETIME;
-        this.game.bullets.add(this);
+        this.game.gameEntities.bullets.add(this);
     }
 
     update() {
@@ -1181,7 +1242,7 @@ class Bullet extends GameObject {
 
     destroy() {
         this.destroyed = true;
-        this.game.bullets.delete(this);
+        this.game.gameEntities.bullets.delete(this);
         super.destroy();
     }
 }
@@ -1517,7 +1578,7 @@ class GameView extends Multisynq.View {
         
         // Draw walls with Doom-style shading
         this.ctx.fillStyle = "#444";
-        for (const wall of this.model.walls) {
+        for (const wall of this.model.gameStatic.walls) {
             this.ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
             // Add highlight edge
             this.ctx.fillStyle = "#666";
@@ -1527,12 +1588,12 @@ class GameView extends Multisynq.View {
         }
         
         // Draw powerups
-        for (const powerup of this.model.powerups) {
+        for (const powerup of this.model.gameEntities.powerups) {
             this.drawPowerup(powerup);
         }
         
         // Draw monsters with smoothed positions
-        for (const monster of this.model.monsters) {
+        for (const monster of this.model.gameEntities.monsters) {
             if (!monster.dead) {
                 this.drawMonster(monster);
             }
@@ -1544,7 +1605,7 @@ class GameView extends Multisynq.View {
         }
         
         // Draw bullets with smoothed positions  
-        for (const bullet of this.model.bullets) {
+        for (const bullet of this.model.gameEntities.bullets) {
             this.drawBullet(bullet);
         }
     }
@@ -1827,7 +1888,7 @@ class GameView extends Multisynq.View {
             status.textContent = "CONNECTING TO MARS BASE...";
         }
         
-        const aliveMonsters = Array.from(this.model.monsters).filter(m => !m.dead);
+        const aliveMonsters = Array.from(this.model.gameEntities.monsters).filter(m => !m.dead);
         const totalPlayers = this.model.players.size + this.model.queue.length;
         queue.textContent = `MARINES: ${this.model.players.size}/${C.MAX_ACTIVE_PLAYERS} | QUEUE: ${this.model.queue.length} | TOTAL: ${totalPlayers} | DEMONS: ${aliveMonsters.length}`;
     }
