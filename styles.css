@@ -187,26 +187,27 @@ html, body {
         bottom: 230px !important;
         height: 120px !important;
         font-size: 10px !important;
-        pointer-events: none !important;
     }
 
     #initials {
         bottom: 180px !important;
         padding: 8px !important;
         font-size: 12px !important;
-        pointer-events: none !important;
-        -webkit-user-select: none !important;
-        user-select: none !important;
     }
 
     #controls {
         display: none !important;
     }
     
-    /* Disable chat input on mobile touch devices */
-    #chat-input, #chat-send {
-        pointer-events: none !important;
-        opacity: 0.5 !important;
+    /* Make chat input smaller but functional on mobile */
+    #chat-input {
+        font-size: 12px !important;
+        padding: 6px !important;
+    }
+    
+    #chat-send {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
     }
     
     /* Bigger Joysticks */
