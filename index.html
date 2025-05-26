@@ -729,7 +729,7 @@ class Game extends Multisynq.Model {
                     const knockbackAngle = Math.atan2(player.y - monster.y, player.x - monster.x);
                     player.knockback(knockbackAngle, C.KNOCKBACK_FORCE);
                     
-                    player.takeDamage(C.MONSTER_DAMAGE);
+                    player.takeDamage(monster.damage);
                     
                     if (player.dead) {
                         this.playerKilled(player, null); // No killer for monster kills
@@ -1050,7 +1050,7 @@ class Player extends GameObject {
     knockback(angle, force) {
         this.knockbackVx = Math.cos(angle) * force;
         this.knockbackVy = Math.sin(angle) * force;
-        this.invincible = C.INVINCIBILITY_FRAMES;
+        // Don't set invincibility here - let takeDamage handle it
     }
 
     update() {
