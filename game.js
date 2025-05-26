@@ -1258,7 +1258,7 @@ class GameView extends Multisynq.View {
             e.preventDefault();
             
             const now = performance.now();
-            if (now - this.lastTouchUpdate < 16.67) return; // 60fps = 16.67ms
+            if (now - this.lastTouchUpdate < 50) return; // 20fps = 50ms
             this.lastTouchUpdate = now;
             
             for (let touch of e.touches) {
