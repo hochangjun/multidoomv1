@@ -29,20 +29,59 @@
                 box-shadow: 0 0 20px #ff3333;
                 cursor: crosshair;
             }
-            #joystick {
+            /* Mobile Controls Container */
+            #mobile-controls {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 200px;
+                display: none;
+                pointer-events: none;
+                z-index: 1000;
+            }
+            
+            /* Movement Joystick (Left) */
+            #move-joystick {
                 position: absolute;
-                right: 50px;
-                bottom: 50px;
+                left: 30px;
+                bottom: 30px;
                 width: 120px;
                 height: 120px;
-                border: 3px solid #ff6666;
+                border: 3px solid #00ff00;
                 border-radius: 60px;
-                opacity: 0.7;
-                display: none;
-                background: rgba(255, 0, 0, 0.1);
-                box-shadow: 0 0 15px #ff3333;
+                opacity: 0.8;
+                background: rgba(0, 255, 0, 0.1);
+                box-shadow: 0 0 15px #00ff00;
+                pointer-events: auto;
             }
-            #knob {
+            #move-knob {
+                position: absolute;
+                left: 20px;
+                top: 20px;
+                width: 80px;
+                height: 80px;
+                border-radius: 40px;
+                background: linear-gradient(45deg, #00ff00, #66ff66);
+                box-shadow: 0 0 10px #00ff00;
+                pointer-events: none;
+            }
+            
+            /* Aim/Shoot Joystick (Right) */
+            #aim-joystick {
+                position: absolute;
+                right: 30px;
+                bottom: 30px;
+                width: 120px;
+                height: 120px;
+                border: 3px solid #ff3333;
+                border-radius: 60px;
+                opacity: 0.8;
+                background: rgba(255, 51, 51, 0.1);
+                box-shadow: 0 0 15px #ff3333;
+                pointer-events: auto;
+            }
+            #aim-knob {
                 position: absolute;
                 left: 20px;
                 top: 20px;
@@ -51,6 +90,30 @@
                 border-radius: 40px;
                 background: linear-gradient(45deg, #ff3333, #ff6666);
                 box-shadow: 0 0 10px #ff3333;
+                pointer-events: none;
+            }
+            
+            /* Mobile Labels */
+            .joystick-label {
+                position: absolute;
+                top: -25px;
+                left: 50%;
+                transform: translateX(-50%);
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: bold;
+                text-shadow: 0 0 5px #000;
+                pointer-events: none;
+            }
+            
+            /* Show mobile controls on touch devices */
+            @media (hover: none) and (pointer: coarse) {
+                #mobile-controls {
+                    display: block;
+                }
+                #canvas {
+                    margin-bottom: 200px;
+                }
             }
             #ui {
                 position: fixed;
@@ -119,7 +182,19 @@
     <body>
         <div id="title">DOOM ARENA</div>
         <canvas id="canvas" width="800" height="600"></canvas>
-        <div id="joystick"><div id="knob"></div></div>
+        
+        <!-- Mobile Controls -->
+        <div id="mobile-controls">
+            <div id="move-joystick">
+                <div class="joystick-label">MOVE</div>
+                <div id="move-knob"></div>
+            </div>
+            <div id="aim-joystick">
+                <div class="joystick-label">AIM & SHOOT</div>
+                <div id="aim-knob"></div>
+            </div>
+        </div>
+        
         <div id="ui">
             <div id="status">Connecting...</div>
             <div id="queue"></div>
@@ -1127,29 +1202,50 @@ class GameView extends Multisynq.View {
     }
 
     setupTouchControls() {
-        const joystick = document.getElementById("joystick");
-        const knob = document.getElementById("knob");
+        const moveJoystick = document.getElementById("move-joystick");
+        const moveKnob = document.getElementById("move-knob");
+        const aimJoystick = document.getElementById("aim-joystick");
+        const aimKnob = document.getElementById("aim-knob");
         
-        let touchId = null;
-        let centerX = 0, centerY = 0;
+        let moveTouchId = null;
+        let aimTouchId = null;
+        let isShooting = false;
+        let shootInterval = null;
         
-        document.addEventListener('touchstart', (e) => {
-            if (touchId === null && e.touches.length > 0) {
-                const touch = e.touches[0];
-                touchId = touch.identifier;
-                centerX = touch.clientX;
-                centerY = touch.clientY;
+        // Movement joystick
+        moveJoystick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (moveTouchId === null) {
+                moveTouchId = e.touches[0].identifier;
+            }
+        });
+        
+        // Aim joystick
+        aimJoystick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (aimTouchId === null) {
+                aimTouchId = e.touches[0].identifier;
+                isShooting = true;
                 
-                joystick.style.left = `${centerX - 60}px`;
-                joystick.style.top = `${centerY - 60}px`;
-                joystick.style.display = "block";
+                // Start continuous shooting
+                shootInterval = setInterval(() => {
+                    if (isShooting) {
+                        this.publish(this.viewId, "shoot");
+                    }
+                }, 200); // Shoot every 200ms
             }
         });
         
         document.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            
             for (let touch of e.touches) {
-                if (touch.identifier === touchId) {
+                // Handle movement joystick
+                if (touch.identifier === moveTouchId) {
+                    const rect = moveJoystick.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
                     const dx = touch.clientX - centerX;
                     const dy = touch.clientY - centerY;
                     
@@ -1157,8 +1253,8 @@ class GameView extends Multisynq.View {
                     const clampedDx = Math.max(-maxDistance, Math.min(maxDistance, dx));
                     const clampedDy = Math.max(-maxDistance, Math.min(maxDistance, dy));
                     
-                    knob.style.left = `${20 + clampedDx}px`;
-                    knob.style.top = `${20 + clampedDy}px`;
+                    moveKnob.style.left = `${20 + clampedDx}px`;
+                    moveKnob.style.top = `${20 + clampedDy}px`;
                     
                     // Update movement
                     const newKeys = {
@@ -1172,26 +1268,82 @@ class GameView extends Multisynq.View {
                         this.keys = newKeys;
                         this.publish(this.viewId, "move", this.keys);
                     }
-                    break;
+                }
+                
+                // Handle aim joystick
+                if (touch.identifier === aimTouchId) {
+                    const rect = aimJoystick.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
+                    const dx = touch.clientX - centerX;
+                    const dy = touch.clientY - centerY;
+                    
+                    const maxDistance = 30;
+                    const clampedDx = Math.max(-maxDistance, Math.min(maxDistance, dx));
+                    const clampedDy = Math.max(-maxDistance, Math.min(maxDistance, dy));
+                    
+                    aimKnob.style.left = `${20 + clampedDx}px`;
+                    aimKnob.style.top = `${20 + clampedDy}px`;
+                    
+                    // Update aim direction
+                    if (Math.abs(clampedDx) > 5 || Math.abs(clampedDy) > 5) {
+                        const angle = Math.atan2(clampedDy, clampedDx);
+                        this.publish(this.viewId, "aim", {angle});
+                    }
                 }
             }
         });
         
         document.addEventListener('touchend', (e) => {
             for (let touch of e.changedTouches) {
-                if (touch.identifier === touchId) {
-                    touchId = null;
-                    joystick.style.display = "none";
-                    knob.style.left = "20px";
-                    knob.style.top = "20px";
+                // Handle movement joystick end
+                if (touch.identifier === moveTouchId) {
+                    moveTouchId = null;
+                    moveKnob.style.left = "20px";
+                    moveKnob.style.top = "20px";
                     
                     // Stop movement
                     this.keys = {up: false, down: false, left: false, right: false};
                     this.publish(this.viewId, "move", this.keys);
+                }
+                
+                // Handle aim joystick end
+                if (touch.identifier === aimTouchId) {
+                    aimTouchId = null;
+                    aimKnob.style.left = "20px";
+                    aimKnob.style.top = "20px";
                     
-                    // Shoot on touch end
-                    this.publish(this.viewId, "shoot");
-                    break;
+                    // Stop shooting
+                    isShooting = false;
+                    if (shootInterval) {
+                        clearInterval(shootInterval);
+                        shootInterval = null;
+                    }
+                }
+            }
+        });
+        
+        // Handle touch cancel (when user drags outside)
+        document.addEventListener('touchcancel', (e) => {
+            for (let touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    moveTouchId = null;
+                    moveKnob.style.left = "20px";
+                    moveKnob.style.top = "20px";
+                    this.keys = {up: false, down: false, left: false, right: false};
+                    this.publish(this.viewId, "move", this.keys);
+                }
+                
+                if (touch.identifier === aimTouchId) {
+                    aimTouchId = null;
+                    aimKnob.style.left = "20px";
+                    aimKnob.style.top = "20px";
+                    isShooting = false;
+                    if (shootInterval) {
+                        clearInterval(shootInterval);
+                        shootInterval = null;
+                    }
                 }
             }
         });
@@ -1522,6 +1674,8 @@ class GameView extends Multisynq.View {
 Multisynq.Session.join({
     apiKey: '2zU3zTlT1sS9q0gtuny9l7uLlRi2GYsjibFLecKs40',
     appId: 'io.multisynq.collaborative-canvas-app',
+    name: 'global-arena',
+    password: 'doom2024',
     model: Game,
     view: GameView,
 });

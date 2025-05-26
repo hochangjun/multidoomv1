@@ -25,11 +25,11 @@ A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framewo
 - **Invincibility Frames**: 1.5 seconds of immunity after taking damage
 
 ### Technical Features
-- **Mobile Responsive**: Full touch controls with on-screen joystick
-  - Touch and drag for movement
-  - Release touch to shoot
-  - Tap anywhere to shoot
-  - Automatic joystick positioning
+- **Mobile Responsive**: Dual joystick touch controls
+  - Left joystick: WASD-style movement
+  - Right joystick: Aim direction + continuous shooting
+  - Simultaneous move and shoot capability
+  - Auto-detection for touch devices
 - **Sound Effects**: Procedural audio using Web Audio API
 - **Enhanced Visual Effects**: 
   - 2.5x bigger bullets for damage boost
@@ -65,9 +65,10 @@ A real-time multiplayer 2D Doom-style arena shooter built with Multisynq framewo
 - **Enter Name**: Bottom-left input field
 
 ### Mobile
-- **Touch Joystick**: Movement (appears on touch)
-- **Touch Release**: Shoot
-- **Tap Screen**: Alternative shooting
+- **Left Joystick (Green)**: Movement control
+- **Right Joystick (Red)**: Aim direction + continuous shooting
+- **Dual Control**: Move and shoot simultaneously
+- **Auto-detect**: Controls appear automatically on touch devices
 
 ## 🏗️ Architecture
 
