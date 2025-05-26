@@ -1783,13 +1783,14 @@ class GameView extends Multisynq.View {
 // Configuration - these should be set via build-time environment variables
 const CONFIG = {
     apiKey: 'REPLACE_WITH_API_KEY',
+    appId: 'REPLACE_WITH_APP_ID',
     sessionName: 'REPLACE_WITH_SESSION_NAME', 
     sessionPassword: 'REPLACE_WITH_SESSION_PASSWORD'
 };
 
 Multisynq.Session.join({
     apiKey: CONFIG.apiKey,
-    appId: 'io.multisynq.multidoomv1-app',
+    appId: CONFIG.appId,
     name: CONFIG.sessionName,
     password: CONFIG.sessionPassword,
     model: Game,

@@ -9,6 +9,7 @@ let gameJsContent = fs.readFileSync(gameJsPath, 'utf8');
 gameJsContent = gameJsContent.replace('REPLACE_WITH_API_KEY', process.env.MULTISYNQ_API_KEY || 'your-api-key-here');
 gameJsContent = gameJsContent.replace('REPLACE_WITH_SESSION_NAME', process.env.MULTISYNQ_SESSION_NAME || 'default-session');
 gameJsContent = gameJsContent.replace('REPLACE_WITH_SESSION_PASSWORD', process.env.MULTISYNQ_SESSION_PASSWORD || 'default-password');
+gameJsContent = gameJsContent.replace('REPLACE_WITH_APP_ID', process.env.MULTISYNQ_APP_ID || 'io.multisynq.multidoomv1-app');
 
 // Write the updated content to a build directory or overwrite the original
 const buildDir = path.join(__dirname, 'dist');
